@@ -43,6 +43,14 @@ export async function getDatabase(dbName: string = "fmb"): Promise<Db> {
   return client.db(dbName);
 }
 
+// Synchronous helper to get database (assumes connection is ready)
+export function getDb(dbName: string = "fmb"): Db {
+  if (!client) {
+    throw new Error("MongoDB client not initialized. Call initMongoDB() first.");
+  }
+  return client.db(dbName);
+}
+
 // Initialize connection and verify it works
 export async function initMongoDB() {
   try {

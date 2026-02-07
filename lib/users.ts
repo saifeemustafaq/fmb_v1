@@ -1,5 +1,6 @@
-import { getMongoClient, COLLECTIONS, type Role } from "@/lib/config";
+import clientPromise from "@/lib/mongodb";
 import { ObjectId } from "mongodb";
+import type { Role } from "@/lib/auth/constants";
 
 export type UserRecord = {
   _id: ObjectId;
@@ -14,8 +15,8 @@ export type UserRecord = {
 };
 
 export async function getUsersCollection() {
-  const client = await getMongoClient();
-  return client.db().collection<UserRecord>(COLLECTIONS.USERS);
+  const client = await clientPromise;
+  return client.db().collection<UserRecord>("users");
 }
 
 export async function findUserByITS(its: number) {

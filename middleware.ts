@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { jwtVerify } from "jose";
-import { SESSION_COOKIE_NAME, JWT_SECRET, type Role } from "@/lib/config";
+import { SESSION_COOKIE_NAME, type Role } from "@/lib/auth/constants";
 
 const protectedPrefixes = ["/admin", "/cook", "/volunteer"];
 
-const secretKey = new TextEncoder().encode(JWT_SECRET);
+const jwtSecret = process.env.JWT_SECRET;
+const secretKey = jwtSecret ? new TextEncoder().encode(jwtSecret) : null;
 
 function isAuthorized(userRole: Role, requiredRole: Role) {
   return userRole === "admin" || userRole === requiredRole;
@@ -23,6 +24,10 @@ export async function middleware(request: NextRequest) {
 
   if (!prefix) {
     return NextResponse.next();
+  }
+
+  if (!secretKey) {
+    return redirectToLogin(request);
   }
 
   const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;

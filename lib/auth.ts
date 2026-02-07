@@ -3,11 +3,15 @@ import bcrypt from "bcryptjs";
 import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
-  JWT_SECRET,
   type Role,
-} from "@/lib/config";
+} from "@/lib/auth/constants";
 
-const secretKey = new TextEncoder().encode(JWT_SECRET);
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+  throw new Error("Missing JWT_SECRET in .env.local");
+}
+
+const secretKey = new TextEncoder().encode(jwtSecret);
 
 export type SessionUser = {
   id: string;

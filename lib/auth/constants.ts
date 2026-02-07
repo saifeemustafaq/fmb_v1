@@ -1,2 +1,4 @@
-// Re-export from config for backward compatibility
-export { SESSION_COOKIE_NAME, SESSION_MAX_AGE_SECONDS, type Role } from "@/lib/config";
+export const SESSION_COOKIE_NAME = "session";
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+
+export type Role = "admin" | "cook" | "volunteer";

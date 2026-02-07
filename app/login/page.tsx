@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const roleRedirect: Record<string, string> = {
@@ -9,7 +9,7 @@ const roleRedirect: Record<string, string> = {
   volunteer: "/volunteer",
 };
 
-function LoginForm() {
+export default function LoginPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const next = searchParams.get("next");
@@ -106,13 +106,5 @@ function LoginForm() {
         </form>
       </div>
     </main>
-  );
-}
-
-export default function LoginPage() {
-  return (
-    <Suspense fallback={<div className="min-h-screen bg-white" />}>
-      <LoginForm />
-    </Suspense>
   );
 }

@@ -8,14 +8,24 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
 
+const DAY_TYPE_LABELS: Record<string, string> = {
+  no_thali: "No thali",
+  thali: "Thali",
+  jamaat_wide_thali: "Jamaat wide thali",
+  miqaat: "Miqaat",
+};
+
 type WeekPlan = {
   _id: string;
   weekStartDate: string;
+  assignedCookId: string;
   days: Array<{
     date: string;
-    isClosed: boolean;
+    dayType: string;
+    isClosed?: boolean;
     headcount: number;
     menuItems: string[];
+    assignedCookId: string | null;
   }>;
 };
 
@@ -23,6 +33,14 @@ type Cart = {
   _id: string;
   status: "draft" | "submitted" | "finalized";
 };
+
+function getMyDays(plan: WeekPlan, userId: string) {
+  const defaultCookId = plan.assignedCookId;
+  return plan.days.filter((day) => {
+    const effectiveCookId = day.assignedCookId ?? defaultCookId;
+    return effectiveCookId === userId;
+  });
+}
 
 export default function CookDashboard() {
   const router = useRouter();
@@ -51,10 +69,14 @@ export default function CookDashboard() {
           const { weekPlan: fetchedWeekPlan } = await weekRes.json();
           setWeekPlan(fetchedWeekPlan);
 
-          // If week plan exists, check for existing cart
           if (fetchedWeekPlan) {
-            // TODO: Add API endpoint to get cart by week plan
-            // For now, we'll create cart on-demand in the cart builder page
+            const cartRes = await fetch(
+              `/api/carts?weekPlanId=${encodeURIComponent(fetchedWeekPlan._id)}`
+            );
+            if (cartRes.ok) {
+              const { cart: existingCart } = await cartRes.json();
+              setCart(existingCart ?? null);
+            }
           }
         }
       } catch (error) {
@@ -103,45 +125,63 @@ export default function CookDashboard() {
             <Card>
               <CardHeader>
                 <CardTitle className="text-xl">
-                  This Week&apos;s Plan
+                  Your Assigned Plan
                   <Badge className="ml-3 text-sm" variant="default">
                     Active
                   </Badge>
                 </CardTitle>
                 <CardDescription className="text-base">
-                  Week of {formatDate(weekPlan.weekStartDate)}
+                  {weekPlan.days.length === 1
+                    ? "Single-day plan"
+                    : `Week of ${formatDate(weekPlan.weekStartDate)}`}
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {/* Day Summary */}
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                  {weekPlan.days.slice(0, 7).map((day, index) => (
-                    <div key={index}>
-                      {index > 0 && (
-                        <div className="my-3 border-t border-slate-200" />
-                      )}
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="font-medium">
-                            {getDayName(day.date)}
-                          </span>
-                          {day.isClosed ? (
-                            <span className="text-red-600">Closed</span>
-                          ) : (
-                            <span className="text-slate-600">
-                              {day.headcount} people
-                            </span>
-                          )}
-                        </div>
-                        {!day.isClosed && (
-                          <p className="text-slate-700">
-                            {day.menuItems.join(", ")}
-                          </p>
+                {(() => {
+                  const myDays = getMyDays(weekPlan, userId ?? "");
+                  return (
+                    <>
+                      <p className="text-sm font-medium text-slate-700">
+                        Your days: {myDays.length === 0 ? "None" : myDays.map((d) => getDayName(d.date)).join(", ")}
+                      </p>
+                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                        {myDays.length === 0 ? (
+                          <p className="text-sm text-slate-600">No days assigned to you in this plan.</p>
+                        ) : (
+                          myDays.map((day, index) => (
+                            <div key={day.date}>
+                              {index > 0 && (
+                                <div className="my-3 border-t border-slate-200" />
+                              )}
+                              <div className="space-y-2 text-sm">
+                                <div className="flex flex-wrap items-center justify-between gap-2">
+                                  <span className="font-medium">
+                                    {getDayName(day.date)}
+                                  </span>
+                                  <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-700">
+                                    {DAY_TYPE_LABELS[day.dayType] ?? day.dayType}
+                                  </span>
+                                </div>
+                                {day.dayType !== "no_thali" && (
+                                  <>
+                                    <span className="text-slate-600">
+                                      {day.headcount} people
+                                    </span>
+                                    {day.menuItems.length > 0 && (
+                                      <p className="text-slate-700">
+                                        {day.menuItems.join(", ")}
+                                      </p>
+                                    )}
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          ))
                         )}
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    </>
+                  );
+                })()}
 
                 {/* Cart Action */}
                 {cart ? (

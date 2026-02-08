@@ -81,6 +81,112 @@ export async function getCartByWeekAndCook(
 }
 
 /**
+ * Get all carts for a week plan (one per cook who has days in that plan)
+ */
+export async function getCartsByWeekPlan(weekPlanId: ObjectId) {
+  const carts = getCartsCollection();
+  return carts
+    .find({ weekPlanId })
+    .sort({ createdAt: 1 })
+    .toArray();
+}
+
+/** Aggregated line for combined cart (merged by ingredientId + unit) */
+export type CombinedCartItem = {
+  ingredientId: ObjectId;
+  nameSnapshot: string;
+  categorySnapshot: string;
+  storeIdSnapshot: ObjectId | null;
+  quantityRequested: number;
+  unit: string;
+  quantityToBuy: number | null;
+  /** Optional: which carts contributed (for admin transparency) */
+  sourceCartIds?: ObjectId[];
+  sourceCookIds?: ObjectId[];
+};
+
+/**
+ * Get combined cart for a week plan: merge all cart items by ingredient
+ * (same ingredientId + unit → sum quantities). Used for final shopping list / PDF.
+ */
+export async function getCombinedCartForWeekPlan(
+  weekPlanId: ObjectId,
+  options?: { includeSources?: boolean }
+): Promise<CombinedCartItem[]> {
+  const carts = getCartsCollection();
+  const cartItems = getCartItemsCollection();
+
+  const cartsForWeek = await carts.find({ weekPlanId }).toArray();
+  if (cartsForWeek.length === 0) return [];
+
+  const cartIds = cartsForWeek.map((c) => c._id!);
+  const items = await cartItems
+    .find({ cartId: { $in: cartIds } })
+    .toArray();
+
+  const includeSources = options?.includeSources ?? false;
+  const byKey = new Map<
+    string,
+    {
+      item: Omit<CombinedCartItem, "sourceCartIds" | "sourceCookIds">;
+      sourceCartIds: ObjectId[];
+      sourceCookIds: ObjectId[];
+    }
+  >();
+
+  for (const it of items) {
+    const cart = cartsForWeek.find((c) => c._id!.equals(it.cartId));
+    const key = `${it.ingredientId.toString()}|${it.unit}`;
+    const existing = byKey.get(key);
+    const qtyToBuy = it.quantityToBuy ?? null;
+    if (existing) {
+      existing.item.quantityRequested += it.quantityRequested;
+      const sumQtyToBuy =
+        (existing.item.quantityToBuy ?? 0) + (qtyToBuy ?? 0);
+      existing.item.quantityToBuy =
+        sumQtyToBuy === 0 ? null : sumQtyToBuy;
+      if (includeSources) {
+        if (!existing.sourceCartIds.some((id) => id.equals(it.cartId))) {
+          existing.sourceCartIds.push(it.cartId);
+          if (cart && !existing.sourceCookIds.some((id) => id.equals(cart.cookId))) {
+            existing.sourceCookIds.push(cart.cookId);
+          }
+        }
+      }
+    } else {
+      byKey.set(key, {
+        item: {
+          ingredientId: it.ingredientId,
+          nameSnapshot: it.nameSnapshot,
+          categorySnapshot: it.categorySnapshot,
+          storeIdSnapshot: it.storeIdSnapshot,
+          quantityRequested: it.quantityRequested,
+          unit: it.unit,
+          quantityToBuy: qtyToBuy,
+        },
+        sourceCartIds: includeSources ? [it.cartId] : [],
+        sourceCookIds: includeSources && cart ? [cart.cookId] : [],
+      });
+    }
+  }
+
+  const result: CombinedCartItem[] = [];
+  for (const { item, sourceCartIds, sourceCookIds } of byKey.values()) {
+    result.push({
+      ...item,
+      ...(includeSources && { sourceCartIds, sourceCookIds }),
+    });
+  }
+
+  result.sort(
+    (a, b) =>
+      a.categorySnapshot.localeCompare(b.categorySnapshot) ||
+      a.nameSnapshot.localeCompare(b.nameSnapshot)
+  );
+  return result;
+}
+
+/**
  * Add item to cart with ingredient snapshots
  */
 export async function addItemToCart(

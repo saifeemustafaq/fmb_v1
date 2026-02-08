@@ -22,17 +22,19 @@ Key constraints:
 
 ### 1) Weekly planning (Admin)
 
-* Create a **Week Plan**
+* Create a **Week Plan** (full week or single-day ad-hoc plan)
 
-  * days: Mon–Sun
-  * for each day: `status: open/closed`, `menu items`, `headcount`
-* Assign a **Cook** to the week (or per day if you want later).
+  * days: Mon–Sun (or one day for ad-hoc, e.g. “Miqaat day after tomorrow”)
+  * for each day: **day type** (`no_thali` | `thali` | `jamaat_wide_thali` | `miqaat`), `menu items`, `headcount`
+  * assign a **Cook** at week level (default) and/or **per day** (e.g. different cook for Miqaat day)
+* Single-day plan: one date, one day type, one cook → same flow as week plan; cook builds one cart.
+* Multiple cooks in one week: each cook has their own cart for their assigned days; admin sees a **combined cart** (merged items) for the week and can generate one PDF.
 
 ### 2) Cart building (Cook)
 
-* Cook opens the Week Plan → taps a day → sees the menu + headcount.
-* Cook taps **“Build Cart”** (or it auto-creates a cart for the week).
-* Cook adds ingredients (from list) with **quantity + unit**.
+* Cook opens the dashboard and sees **assigned plan(s)** — only **their days** (e.g. Mon–Sat or single Miqaat day), with **day type** (No thali, Thali, Jamaat wide thali, Miqaat), headcount, menu.
+* Cook taps **“Build Cart”** (or “Continue” if a cart already exists). One cart per (week plan, cook).
+* Cook adds ingredients (from list) with **quantity + unit**. Cart builder shows context “Your days: …”.
 * If ingredient not found: **“Add missing ingredient”**
 
   * cook only enters: `name`, selects `unit`, enters `quantity`
@@ -135,15 +137,17 @@ This is your master list + private cook additions.
 ```js
 {
   _id,
-  weekStartDate,          // ISO date (Monday)
+  weekStartDate,          // ISO date (Monday, or single-day plan date)
   createdByAdminId,
-  assignedCookId,         // cook for the week (MVP)
+  assignedCookId,         // default cook for days without per-day override
   days: [
     {
       date,               // ISO date
-      isClosed: false,
+      dayType: "no_thali" | "thali" | "jamaat_wide_thali" | "miqaat",
+      isClosed,           // legacy: true when dayType === "no_thali"
       headcount: 120,
-      menuItems: ["Poha", "Dal", "Rice"] // just names for MVP
+      menuItems: ["Poha", "Dal", "Rice"],  // just names for MVP
+      assignedCookId      // optional; override cook for this day
     }
   ],
   notes,
@@ -151,7 +155,10 @@ This is your master list + private cook additions.
 }
 ```
 
-> Keep “menuItems” as strings for now. You can later map to `recipes`.
+* **Day types:** `no_thali` = no service; `thali`, `jamaat_wide_thali`, `miqaat` = service day with headcount + menuItems.
+* **Single-day plan:** same collection; `days.length === 1`.
+* **Per-day cook:** if `assignedCookId` on a day is set, that cook is responsible for that day; otherwise the week-level `assignedCookId` applies. One cart per (weekPlanId, cookId); combined cart for the week merges all carts by ingredient (sum quantities) for admin/PDF.
+* Keep “menuItems” as strings for now. You can later map to `recipes`.
 
 ### 5) `carts`
 
@@ -176,7 +183,7 @@ Separate collection keeps cart updates simpler.
 {
   _id,
   cartId,
-  ingredientItemId,     // points to ingredient_items (global or private)
+  ingredientId,         // points to ingredients (global or private)
   nameSnapshot,         // store name at time of adding (safe if ingredient renamed)
   categorySnapshot,
   storeIdSnapshot,

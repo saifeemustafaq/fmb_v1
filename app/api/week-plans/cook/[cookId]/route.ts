@@ -3,7 +3,10 @@ import { cookies } from "next/headers";
 import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { getCookAssignedWeekPlan } from "@/lib/week-plans";
+import {
+  getCookAssignedWeekPlan,
+  serializeWeekPlanForResponse,
+} from "@/lib/week-plans";
 
 export async function GET(
   request: Request,
@@ -41,12 +44,7 @@ export async function GET(
     }
 
     return NextResponse.json({
-      weekPlan: {
-        ...weekPlan,
-        _id: weekPlan._id!.toString(),
-        createdByAdminId: weekPlan.createdByAdminId.toString(),
-        assignedCookId: weekPlan.assignedCookId.toString(),
-      },
+      weekPlan: serializeWeekPlanForResponse(weekPlan),
     });
   } catch (error) {
     console.error("Error fetching week plan:", error);

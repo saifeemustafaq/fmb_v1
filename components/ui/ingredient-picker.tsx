@@ -44,6 +44,17 @@ export interface IngredientPickerProps {
    * Group ingredients by category
    */
   groupByCategory?: boolean;
+
+  /**
+   * When true, the list fills available height and scrolls (for mobile view).
+   * Parent should give the component a constrained height (e.g. flex-1 min-h-0).
+   */
+  fillHeight?: boolean;
+
+  /**
+   * When false, the "Add missing ingredient" button is not rendered (e.g. when parent renders it in a sticky footer).
+   */
+  showAddButton?: boolean;
 }
 
 /**
@@ -65,6 +76,8 @@ export function IngredientPicker({
   isLoading = false,
   disabled = false,
   groupByCategory = true,
+  fillHeight = false,
+  showAddButton = true,
 }: IngredientPickerProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState<string>("all");
@@ -159,10 +172,20 @@ export function IngredientPicker({
     );
   }
 
+  const listClassName = fillHeight
+    ? "flex-1 min-h-0 overflow-y-auto space-y-2"
+    : "space-y-2 max-h-96 overflow-y-auto";
+
   return (
-    <div className="w-full space-y-4">
+    <div
+      className={
+        fillHeight
+          ? "flex h-full min-h-0 w-full flex-col gap-4"
+          : "w-full space-y-4"
+      }
+    >
       {/* Search Input */}
-      <div className="relative">
+      <div className="relative shrink-0">
         <Search className="absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400" />
         <Input
           type="text"
@@ -185,8 +208,12 @@ export function IngredientPicker({
 
       {/* Category Tabs (only show when not searching) */}
       {!searchQuery && groupByCategory && categories.length > 0 && (
-        <Tabs value={currentTab} onValueChange={setSelectedTab} className="w-full">
-          <TabsList className="grid w-full grid-cols-3 gap-1 h-auto">
+        <Tabs
+          value={currentTab}
+          onValueChange={setSelectedTab}
+          className={fillHeight ? "flex w-full flex-1 flex-col min-h-0" : "w-full"}
+        >
+          <TabsList className="grid w-full grid-cols-3 gap-1 h-auto shrink-0">
             <TabsTrigger value="all" className="py-2 text-xs sm:text-sm">
               All ({ingredients.length})
             </TabsTrigger>
@@ -206,9 +233,16 @@ export function IngredientPicker({
             )}
           </TabsList>
 
-          <TabsContent value={currentTab} className="mt-4">
+          <TabsContent
+            value={currentTab}
+            className={
+              fillHeight
+                ? "mt-4 flex flex-1 flex-col min-h-0 data-[state=inactive]:hidden"
+                : "mt-4"
+            }
+          >
             {/* Ingredient List */}
-            <div className="space-y-2 max-h-96 overflow-y-auto">
+            <div className={listClassName}>
               {displayGrouped ? (
                 // Grouped view
                 Object.entries(displayGrouped).map(([category, items]) => (
@@ -248,7 +282,7 @@ export function IngredientPicker({
 
       {/* Flat list if not using tabs */}
       {(!groupByCategory || searchQuery || categories.length === 0) && (
-        <div className="space-y-2 max-h-96 overflow-y-auto">
+        <div className={listClassName}>
           {displayedIngredients.length === 0 ? (
             <div className="py-8 text-center text-gray-500">
               {searchQuery
@@ -269,11 +303,11 @@ export function IngredientPicker({
       )}
 
       {/* Add Missing Ingredient Button */}
-      {onAddMissing && (
+      {showAddButton && onAddMissing && (
         <Button
           onClick={onAddMissing}
           variant="outline"
-          className="w-full h-12 text-base font-semibold border-2"
+          className="w-full h-12 text-base font-semibold border-2 shrink-0"
           disabled={disabled}
         >
           <Plus className="mr-2 h-5 w-5" />

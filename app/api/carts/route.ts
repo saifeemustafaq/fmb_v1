@@ -12,6 +12,55 @@ const createCartSchema = z.object({
   }),
 });
 
+export async function GET(request: Request) {
+  try {
+    const cookieStore = await cookies();
+    const token = cookieStore.get(SESSION_COOKIE_NAME);
+    if (!token) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
+
+    const user = await verifySessionToken(token.value);
+    if (user.role !== "cook" && user.role !== "admin") {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const { searchParams } = new URL(request.url);
+    const weekPlanIdParam = searchParams.get("weekPlanId");
+    if (!weekPlanIdParam || !ObjectId.isValid(weekPlanIdParam)) {
+      return NextResponse.json(
+        { error: "weekPlanId query is required and must be valid" },
+        { status: 400 }
+      );
+    }
+
+    const weekPlanId = new ObjectId(weekPlanIdParam);
+    const cookId = new ObjectId(user.id);
+    const cart = await getCartByWeekAndCook(weekPlanId, cookId);
+
+    if (!cart) {
+      return NextResponse.json({ cart: null }, { status: 200 });
+    }
+
+    return NextResponse.json({
+      cart: {
+        _id: cart._id!.toString(),
+        weekPlanId: cart.weekPlanId.toString(),
+        cookId: cart.cookId.toString(),
+        status: cart.status,
+        createdAt: cart.createdAt.toISOString(),
+        updatedAt: cart.updatedAt.toISOString(),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching cart:", error);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function POST(request: Request) {
   try {
     // Verify authentication

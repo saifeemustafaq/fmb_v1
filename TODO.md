@@ -1,7 +1,7 @@
 # FMB v1 — Project TODO & Progress Tracker
 
 **Last Updated:** February 8, 2026  
-**Current Phase:** Cook Phase — Ingredients Foundation  
+**Current Phase:** Weeks Menus + Cart Building (Phase 1A done; 1B in progress)  
 **Status:** On track
 
 ---
@@ -10,15 +10,15 @@
 
 | Phase | Status | Progress |
 |-------|--------|----------|
-| **Phase 0: Foundations** | 🟢 MOSTLY DONE | 80% |
-| **Phase 1A: Cook Cart Building** | ⚪ NOT STARTED | 0% |
-| **Phase 1B: Admin Cart Review** | ⚪ NOT STARTED | 0% |
+| **Phase 0: Foundations** | 🟢 DONE | 100% |
+| **Phase 1A: Week Plans + Cook Cart Building** | 🟢 DONE | 100% |
+| **Phase 1B: Admin Cart Review** | 🟡 IN PROGRESS | 40% |
 | **Phase 2: Nice-to-Have** | ⚪ NOT STARTED | 0% |
 | **Phase 3: Inventory (Optional)** | ⚪ NOT STARTED | 0% |
 
 ---
 
-## 🟢 Phase 0 — Foundations (80% DONE)
+## 🟢 Phase 0 — Foundations (100% DONE)
 
 ### Auth + Roles
 - [x] Admin login page ([app/login/page.tsx](app/login/page.tsx))
@@ -71,115 +71,72 @@
 
 ---
 
-## ⚪ Phase 1A — Cook Cart Building (MVP CORE FEATURE)
+## 🟢 Phase 1A — Week Plans + Cook Cart Building (100% DONE)
 
 ### Data Models
-- [ ] Create `week_plans` MongoDB schema
+- [x] Create `week_plans` schema with day types and per-day cook ([lib/interfaces/cart.ts](lib/interfaces/cart.ts))
   ```js
   {
     _id, weekStartDate, createdByAdminId, assignedCookId,
-    days: [{ date, isClosed, headcount, menuItems }],
+    days: [{ date, dayType: "no_thali"|"thali"|"jamaat_wide_thali"|"miqaat", isClosed?, headcount, menuItems, assignedCookId? }],
     notes, createdAt
   }
   ```
-- [ ] Create `carts` MongoDB schema
-  ```js
-  { _id, weekPlanId, cookId, status: "draft"|"submitted"|"finalized", createdAt, updatedAt }
-  ```
-- [ ] Create `cart_items` MongoDB schema
-  ```js
-  {
-    _id, cartId, ingredientId, nameSnapshot, categorySnapshot, storeIdSnapshot,
-    quantityRequested, unit, quantityToBuy (silent), addedByUserId, createdAt
-  }
-  ```
-- [ ] Create TypeScript interfaces ([lib/interfaces/cart.ts](lib/interfaces/cart.ts))
-  - [ ] `WeekPlanRecord`
-  - [ ] `CartRecord`
-  - [ ] `CartItemRecord`
+- [x] Create `carts` schema — one cart per (weekPlanId, cookId)
+- [x] Create `cart_items` schema with snapshots
+- [x] TypeScript interfaces: `WeekPlanRecord`, `WeekPlanDay`, `DayType`, `CartRecord`, `CartItemRecord`
 
 ### MongoDB Helpers
-- [ ] Cart helper functions ([lib/carts.ts](lib/carts.ts))
-  - [ ] `getCartById(cartId)` — fetch cart with all items populated
-  - [ ] `createCart(weekPlanId, cookId)` — create new cart
-  - [ ] `addItemToCart(cartId, ingredientId, quantity, unit)`
-  - [ ] `removeItemFromCart(cartId, cartItemId)`
-  - [ ] `updateCartItemQuantity(cartItemId, newQuantity)`
-  - [ ] `submitCart(cartId)` — lock for admin review
-  - [ ] `getCookCarts(cookId)` — list all carts for a cook
+- [x] Cart helpers ([lib/carts.ts](lib/carts.ts)): getCartById, createCart, addItemToCart, removeItemFromCart, updateCartItemQuantity, submitCart, getCookCarts, getCartByWeekAndCook, getCartsByWeekPlan, getCombinedCartForWeekPlan
 
-- [ ] Week Plan helper functions ([lib/week-plans.ts](lib/week-plans.ts))
-  - [ ] `getWeekPlanById(weekPlanId)`
-  - [ ] `getCookAssignedWeekPlan(cookId)` — current week for cook
-  - [ ] `createWeekPlan(data)` — admin creates new week
-  - [ ] `updateWeekPlan(weekPlanId, data)`
-  - [ ] `listAllWeekPlans()` — admin view all weeks
-
+- [x] Week Plan helpers ([lib/week-plans.ts](lib/week-plans.ts)): getWeekPlanById, getCookAssignedWeekPlan (per-day cook), getEffectiveCookIdForDay, getDaysForCook, createWeekPlan, updateWeekPlan, listAllWeekPlans, serializeWeekPlanForResponse
 ### API Routes
-- [ ] `POST /api/carts` — create new cart
-- [ ] `GET /api/carts/:cartId` — fetch cart with items
-- [ ] `GET /api/carts/cook/:cookId` — list carts for cook
-- [ ] `POST /api/carts/:cartId/items` — add item to cart
-- [ ] `PATCH /api/carts/:cartId/items/:itemId` — update item quantity
-- [ ] `DELETE /api/carts/:cartId/items/:itemId` — remove item
-- [ ] `PATCH /api/carts/:cartId/submit` — submit cart to admin
-- [ ] `GET /api/week-plans/cook/:cookId` — get assigned week for cook
-- [ ] `GET /api/week-plans/:weekPlanId` — get week details
-- [ ] `POST /api/week-plans` — admin creates week (requires auth)
-- [ ] `PATCH /api/week-plans/:weekPlanId` — admin edits week
+- [x] `POST /api/carts` — create new cart
+- [x] `GET /api/carts?weekPlanId=xxx` — get current user's cart for that week plan
+- [x] `GET /api/carts/:cartId` — fetch cart with items
+- [x] `POST /api/carts/:cartId/items` — add item to cart
+- [x] `PATCH /api/carts/:cartId/items/:itemId` — update item quantity
+- [x] `DELETE /api/carts/:cartId/items/:itemId` — remove item
+- [x] `PATCH /api/carts/:cartId/submit` — submit cart to admin
+- [x] `GET /api/week-plans` — list all week plans (admin)
+- [x] `POST /api/week-plans` — admin create week plan (full or single-day)
+- [x] `GET /api/week-plans/:weekPlanId` — get week details (admin or assigned cook)
+- [x] `PATCH /api/week-plans/:weekPlanId` — admin edit week plan
+- [x] `GET /api/week-plans/cook/:cookId` — get assigned plan for cook (per-day assignment)
+- [x] `GET /api/week-plans/:weekPlanId/carts` — list carts for that week (admin)
+- [x] `GET /api/week-plans/:weekPlanId/combined-cart` — merged cart for week (admin)
 
-### UI Components
-- [ ] Cook dashboard page ([app/cook/page.tsx](app/cook/page.tsx))
-  - [ ] Show assigned week plan
-  - [ ] Day selector (Mon-Sun)
-  - [ ] Menu items + headcount display
-  - [ ] "Build Cart" button
+### Admin UI — Week Plans
+- [x] Week plans list ([app/admin/week-plans/page.tsx](app/admin/week-plans/page.tsx)) — list all plans, Create Week Plan / Create Single-Day Plan
+- [x] Create week plan ([app/admin/week-plans/new/page.tsx](app/admin/week-plans/new/page.tsx)) — full week or single-day, day types, per-day cook override
+- [x] Week plan detail ([app/admin/week-plans/[id]/page.tsx](app/admin/week-plans/[id]/page.tsx)) — days, carts list, View combined cart, link to combined PDF
+- [x] Combined cart PDF page ([app/admin/week-plans/[id]/combined-pdf/page.tsx](app/admin/week-plans/[id]/combined-pdf/page.tsx)) — print-friendly combined list, Print / Save as PDF
 
-- [ ] Cart builder page ([app/cook/cart/[cartId]/page.tsx](app/cook/cart/%5BcartId%5D/page.tsx))
-  - [ ] IngredientPicker component (already built)
-  - [ ] Quantity input (big + / - buttons for seniors)
-  - [ ] Add to cart button
-  - [ ] Cart items list (grouped by category)
-  - [ ] Running total display
-  - [ ] "Add Missing Ingredient" modal
-  - [ ] Submit cart button
+### Cook UI
+- [x] Cook dashboard ([app/cook/page.tsx](app/cook/page.tsx)) — assigned plan, **your days only**, **day types** (No thali, Thali, Jamaat wide thali, Miqaat), Build Cart / Continue Building Cart
+- [x] Cart builder ([app/cook/cart/new/page.tsx](app/cook/cart/new/page.tsx)) — IngredientPicker, quantity +/- , cart items list, "Your days" context, Add missing ingredient, Submit cart
+- [x] Add missing ingredient form ([components/ui/add-missing-ingredient-form.tsx](components/ui/add-missing-ingredient-form.tsx))
+- [x] Cart items list component ([components/ui/cart-items-list.tsx](components/ui/cart-items-list.tsx))
 
-- [ ] Add missing ingredient form ([components/ui/add-missing-ingredient-form.tsx](components/ui/add-missing-ingredient-form.tsx))
-  - [ ] Text input for ingredient name (big)
-  - [ ] Category dropdown (big)
-  - [ ] Unit dropdown (big)
-  - [ ] Optional notes
-  - [ ] Submit button (creates pending ingredient)
-
-- [ ] Cart items list component ([components/ui/cart-items-list.tsx](components/ui/cart-items-list.tsx))
-  - [ ] Show ingredient name + quantity + unit
-  - [ ] Group by category
-  - [ ] +/- buttons to adjust quantity
-  - [ ] Delete item button
-  - [ ] Running total at bottom
-
-### Mobile-First Considerations
+### Mobile-First
+- [x] Buttons 48px+ height, large font, vertical layout in week plan and cart flows
 - [ ] Test on actual mobile device (iOS/Android)
-- [ ] Ensure buttons are 48px+ height
-- [ ] Font size 16px+ for readability
-- [ ] No typing required (use dropdowns, qty buttons instead)
-- [ ] Vertical layout (no horizontal scrolling)
 
 ---
 
-## ⚪ Phase 1B — Admin Cart Review (COMPLETES MVP LOOP)
+## 🟡 Phase 1B — Admin Cart Review (IN PROGRESS)
 
 ### Data Models
 - [ ] Add to `carts`: `quantityApproved`, `notes` fields
-- [ ] Add to `cart_items`: `quantityToBuy` field (computed by admin)
+- [ ] Add to `cart_items`: `quantityToBuy` field (computed by admin) — field exists, admin UI to set it not yet built
 
 ### MongoDB Helpers
-- [ ] Cart review helpers ([lib/carts.ts](lib/carts.ts))
-  - [ ] `getCartsByWeekPlan(weekPlanId)` — all carts for a week
-  - [ ] `getAllSubmittedCarts()` — admin queue of carts to review
-  - [ ] `updateCartItemApprovedQuantity(cartItemId, qty)`
-  - [ ] `markItemAsInStock(cartItemId)` — don't need to buy
-  - [ ] `finalizeCart(cartId)` — lock cart, generate shopping list
+- [x] `getCartsByWeekPlan(weekPlanId)` — all carts for a week ([lib/carts.ts](lib/carts.ts))
+- [x] `getCombinedCartForWeekPlan(weekPlanId)` — merged cart for week ([lib/carts.ts](lib/carts.ts))
+- [ ] `getAllSubmittedCarts()` — admin queue of carts to review
+- [ ] `updateCartItemApprovedQuantity(cartItemId, qty)`
+- [ ] `markItemAsInStock(cartItemId)` — don't need to buy
+- [ ] `finalizeCart(cartId)` — lock cart, generate shopping list
 
 ### API Routes
 - [ ] `GET /api/admin/carts` — list all submitted carts
@@ -202,19 +159,10 @@
   - [ ] "Generate Shopping List" button
 
 ### PDF Generation
-- [ ] Shopping list PDF template ([lib/pdf-generator.ts](lib/pdf-generator.ts))
-  - [ ] Use Playwright/Puppeteer or similar
-  - [ ] Layout: grouped by category
-  - [ ] Show: item name, final qty, unit, store location
-  - [ ] Header: week dates, cook name
-  - [ ] Footer: total items, date printed
-  - [ ] Mobile-friendly font sizes
-
-- [ ] PDF API route (`GET /api/admin/carts/:cartId/pdf`)
-  - [ ] Generate PDF buffer
-  - [ ] Return as downloadable file
-
-- [ ] Download button in cart review UI
+- [x] Combined cart HTML/print template ([lib/pdf-generator.ts](lib/pdf-generator.ts)) — `generateCombinedCartHtml`, grouped by category
+- [x] Combined cart print page ([app/admin/week-plans/[id]/combined-pdf/page.tsx](app/admin/week-plans/[id]/combined-pdf/page.tsx)) — Print / Save as PDF for merged week cart
+- [ ] Single-cart PDF API route (`GET /api/admin/carts/:cartId/pdf`) — optional for per-cook list
+- [ ] Download button in cart review UI (when admin cart review pages exist)
 
 ---
 
@@ -303,25 +251,22 @@
 
 ## 📅 Implementation Order (Recommended)
 
-**Week 1:**
-1. ✅ Phase 0: Ingredients (DONE)
-2. Phase 1A: Cart data models + helpers
-3. Phase 1A: Cart API routes + cook pages
+**Done:**
+1. ✅ Phase 0: Foundations + Ingredients
+2. ✅ Phase 1A: Week plans (day types, per-day cook, single-day) + cart data models + helpers + APIs
+3. ✅ Phase 1A: Admin week-plan UI (list, new, detail, combined cart, combined PDF page)
+4. ✅ Phase 1A: Cook dashboard (your days, day types) + cart builder
+5. ✅ Combined cart PDF (print page for merged week)
 
-**Week 2:**
-4. Phase 1A: Cart UI components (ingredient picker already done)
-5. Phase 1B: Admin cart review helpers + APIs
-6. Phase 1B: Admin review UI pages
+**Next:**
+6. Phase 1B: Admin cart review (list submitted carts, review detail, finalize, single-cart PDF if desired)
+7. Full end-to-end testing (seed → admin creates plan → cook adds → admin reviews → PDF)
+8. Mobile device testing
 
-**Week 3:**
-7. Phase 1B: PDF generation
-8. Full end-to-end testing (seed → cook adds → admin reviews → PDF)
-9. Mobile device testing
-
-**Week 4+:**
-10. Phase 2 features (as desired)
-11. Phase 3 inventory (if needed)
-12. Deployment prep
+**Later:**
+9. Phase 2 features (pending ingredients approval, recipes)
+10. Phase 3 inventory (if needed)
+11. Deployment prep
 
 ---
 
@@ -344,21 +289,22 @@
 ## 🎯 Success Criteria for MVP
 
 - [x] Ingredients seeded and searchable
-- [ ] Cook can view assigned week plan
-- [ ] Cook can create cart and add ingredients
-- [ ] Cook can add missing ingredients (pending approval)
-- [ ] Cook can submit cart
-- [ ] Admin can review all submitted carts
-- [ ] Admin can adjust quantities
-- [ ] Admin can mark items "in stock"
-- [ ] Admin can generate PDF shopping list
-- [ ] PDF is downloadable
-- [ ] All APIs have proper auth
+- [x] Cook can view assigned week plan (your days only, day types)
+- [x] Cook can create cart and add ingredients
+- [x] Cook can add missing ingredients (pending approval)
+- [x] Cook can submit cart
+- [x] Admin can create week plans (full week + single-day, day types, per-day cook)
+- [x] Admin can view week plan detail and carts per week
+- [x] Admin can view combined cart and Print / Save as PDF for week
+- [ ] Admin can review individual submitted carts (Phase 1B)
+- [ ] Admin can adjust quantities and mark items "in stock" (Phase 1B)
+- [x] Combined PDF is downloadable (print page for merged week cart)
+- [x] All APIs have proper auth
 - [ ] Mobile testing complete
-- [ ] No TypeScript/ESLint errors
+- [x] No TypeScript/ESLint errors
 
 ---
 
-**Last Sprint:** Feb 8, 2026  
-**Next Sprint:** Cart phase begins  
+**Last Sprint:** Feb 8, 2026 — Weeks Menus phase implemented (day types, per-day cook, single-day plans, combined cart, admin week-plan UI, cook your-days + day types, combined PDF)  
+**Next Sprint:** Phase 1B — Admin cart review (list submitted carts, review detail, finalize, single-cart PDF if desired)  
 **Contact:** Refer to idea.md for business requirements

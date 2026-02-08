@@ -93,7 +93,8 @@ export function CartItemsList({
                         size="sm"
                         onClick={() => onRemoveItem(item._id)}
                         disabled={isLoading}
-                        className="h-8 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        className="min-h-[44px] min-w-[44px] px-3 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        aria-label={`Remove ${item.nameSnapshot} from cart`}
                       >
                         Remove
                       </Button>
@@ -116,7 +117,8 @@ export function CartItemsList({
                           disabled={
                             isLoading || item.quantityRequested <= 1
                           }
-                          className="h-12 w-12 text-xl"
+                          className="h-12 min-h-[48px] w-12 min-w-[48px] text-xl"
+                          aria-label={`Decrease quantity of ${item.nameSnapshot}`}
                         >
                           −
                         </Button>
@@ -124,7 +126,7 @@ export function CartItemsList({
                           <span className="text-2xl font-semibold text-slate-900">
                             {item.quantityRequested}
                           </span>
-                          <span className="text-sm text-slate-600">
+                          <span className="text-base text-slate-600">
                             {item.unit}
                           </span>
                         </div>
@@ -138,7 +140,8 @@ export function CartItemsList({
                             )
                           }
                           disabled={isLoading}
-                          className="h-12 w-12 text-xl"
+                          className="h-12 min-h-[48px] w-12 min-w-[48px] text-xl"
+                          aria-label={`Increase quantity of ${item.nameSnapshot}`}
                         >
                           +
                         </Button>

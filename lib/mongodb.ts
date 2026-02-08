@@ -17,15 +17,20 @@ let client: MongoClient;
 let clientPromise: Promise<MongoClient>;
 
 declare global {
+  var _mongoClient: MongoClient | undefined;
   var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
 if (process.env.NODE_ENV === "development") {
   // In development mode, use a global variable so the connection
-  // is not recreated on every hot reload
+  // is not recreated on every hot reload. Cache both client and promise
+  // so getDb() has a valid client when the module is re-evaluated (e.g. HMR).
   if (!global._mongoClientPromise) {
     client = new MongoClient(uri, options);
+    global._mongoClient = client;
     global._mongoClientPromise = client.connect();
+  } else {
+    client = global._mongoClient!;
   }
   clientPromise = global._mongoClientPromise;
 } else {

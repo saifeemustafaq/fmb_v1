@@ -4,7 +4,8 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { createCart, getCartByWeekAndCook } from "@/lib/carts";
+import { createCart, getCartByWeekAndCook, getCookCarts, getCartItemCount } from "@/lib/carts";
+import { getWeekPlanById } from "@/lib/week-plans";
 
 const createCartSchema = z.object({
   weekPlanId: z.string().refine((id) => ObjectId.isValid(id), {
@@ -27,15 +28,43 @@ export async function GET(request: Request) {
 
     const { searchParams } = new URL(request.url);
     const weekPlanIdParam = searchParams.get("weekPlanId");
-    if (!weekPlanIdParam || !ObjectId.isValid(weekPlanIdParam)) {
+    const cookId = new ObjectId(user.id);
+
+    // List all carts for the cook (history) when weekPlanId is omitted
+    if (!weekPlanIdParam || weekPlanIdParam.trim() === "") {
+      const carts = await getCookCarts(cookId);
+      const cartsWithCount = await Promise.all(
+        carts.map(async (cart) => {
+          const itemCount = await getCartItemCount(cart._id!);
+          const plan = await getWeekPlanById(cart.weekPlanId);
+          const weekStartDate = plan?.weekStartDate
+            ? (plan.weekStartDate instanceof Date
+                ? plan.weekStartDate.toISOString().slice(0, 10)
+                : String(plan.weekStartDate))
+            : null;
+          return {
+            _id: cart._id!.toString(),
+            weekPlanId: cart.weekPlanId.toString(),
+            cookId: cart.cookId.toString(),
+            status: cart.status,
+            itemCount,
+            weekStartDate,
+            createdAt: cart.createdAt.toISOString(),
+            updatedAt: cart.updatedAt.toISOString(),
+          };
+        })
+      );
+      return NextResponse.json({ carts: cartsWithCount });
+    }
+
+    if (!ObjectId.isValid(weekPlanIdParam)) {
       return NextResponse.json(
-        { error: "weekPlanId query is required and must be valid" },
+        { error: "weekPlanId query must be valid when provided" },
         { status: 400 }
       );
     }
 
     const weekPlanId = new ObjectId(weekPlanIdParam);
-    const cookId = new ObjectId(user.id);
     const cart = await getCartByWeekAndCook(weekPlanId, cookId);
 
     if (!cart) {

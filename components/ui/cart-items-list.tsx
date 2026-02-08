@@ -45,9 +45,9 @@ export function CartItemsList({
 
   if (items.length === 0) {
     return (
-      <Card className="border-slate-200 bg-slate-50">
-        <CardContent className="py-12 text-center">
-          <p className="text-base text-slate-600">
+      <Card className="border-slate-200 bg-slate-50 py-4">
+        <CardContent className="py-6 px-4 text-center">
+          <p className="text-sm text-slate-600">
             Your cart is empty. Add ingredients to get started.
           </p>
         </CardContent>
@@ -56,13 +56,13 @@ export function CartItemsList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* Cart Summary */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-lg">
+      <Card className="py-3 gap-2">
+        <CardHeader className="py-0 px-4">
+          <CardTitle className="text-base font-medium">
             Cart Summary
-            <Badge className="ml-3 text-sm" variant="secondary">
+            <Badge className="ml-2 text-xs" variant="secondary">
               {totalItems} {totalItems === 1 ? "item" : "items"}
             </Badge>
           </CardTitle>
@@ -71,20 +71,20 @@ export function CartItemsList({
 
       {/* Items by Category */}
       {categories.map((category) => (
-        <Card key={category}>
-          <CardHeader>
-            <CardTitle className="text-base font-medium text-slate-700">
+        <Card key={category} className="py-3 gap-2">
+          <CardHeader className="py-0 px-4 pb-1">
+            <CardTitle className="text-sm font-medium text-slate-700">
               {category}
             </CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
+          <CardContent className="px-4 pt-0 space-y-0">
             {groupedItems[category].map((item, index) => (
               <div key={item._id}>
-                {index > 0 && <Separator className="my-3" />}
-                <div className="space-y-3">
+                {index > 0 && <Separator className="my-2" />}
+                <div className="space-y-1.5 py-1.5">
                   {/* Item Name */}
-                  <div className="flex items-start justify-between">
-                    <h4 className="text-base font-medium text-slate-900">
+                  <div className="flex items-center justify-between gap-2">
+                    <h4 className="text-sm font-medium text-slate-900 truncate">
                       {item.nameSnapshot}
                     </h4>
                     {!readonly && (
@@ -93,7 +93,7 @@ export function CartItemsList({
                         size="sm"
                         onClick={() => onRemoveItem(item._id)}
                         disabled={isLoading}
-                        className="min-h-[44px] min-w-[44px] px-3 text-red-600 hover:bg-red-50 hover:text-red-700"
+                        className="h-8 min-w-8 shrink-0 px-2 text-xs text-red-600 hover:bg-red-50 hover:text-red-700"
                         aria-label={`Remove ${item.nameSnapshot} from cart`}
                       >
                         Remove
@@ -102,12 +102,12 @@ export function CartItemsList({
                   </div>
 
                   {/* Quantity Controls */}
-                  <div className="flex items-center gap-3">
+                  <div className="flex items-center gap-2">
                     {!readonly ? (
                       <>
                         <Button
                           variant="outline"
-                          size="lg"
+                          size="sm"
                           onClick={() =>
                             onUpdateQuantity(
                               item._id,
@@ -117,22 +117,22 @@ export function CartItemsList({
                           disabled={
                             isLoading || item.quantityRequested <= 1
                           }
-                          className="h-12 min-h-[48px] w-12 min-w-[48px] text-xl"
+                          className="h-8 w-8 shrink-0 p-0 text-base"
                           aria-label={`Decrease quantity of ${item.nameSnapshot}`}
                         >
                           −
                         </Button>
-                        <div className="flex min-w-[100px] flex-col items-center">
-                          <span className="text-2xl font-semibold text-slate-900">
+                        <div className="flex min-w-16 flex-col items-center">
+                          <span className="text-base font-semibold text-slate-900">
                             {item.quantityRequested}
                           </span>
-                          <span className="text-base text-slate-600">
+                          <span className="text-xs text-slate-600">
                             {item.unit}
                           </span>
                         </div>
                         <Button
                           variant="outline"
-                          size="lg"
+                          size="sm"
                           onClick={() =>
                             onUpdateQuantity(
                               item._id,
@@ -140,18 +140,18 @@ export function CartItemsList({
                             )
                           }
                           disabled={isLoading}
-                          className="h-12 min-h-[48px] w-12 min-w-[48px] text-xl"
+                          className="h-8 w-8 shrink-0 p-0 text-base"
                           aria-label={`Increase quantity of ${item.nameSnapshot}`}
                         >
                           +
                         </Button>
                       </>
                     ) : (
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-2xl font-semibold text-slate-900">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base font-semibold text-slate-900">
                           {item.quantityRequested}
                         </span>
-                        <span className="text-base text-slate-600">
+                        <span className="text-xs text-slate-600">
                           {item.unit}
                         </span>
                       </div>

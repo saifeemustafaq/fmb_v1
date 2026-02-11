@@ -356,65 +356,62 @@ export default function AdminIngredientsPage() {
           <>
             <Card className="mb-4 sm:mb-6">
               <CardHeader className="space-y-4">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-lg sm:text-xl">
+                <div className="flex flex-row items-center justify-between gap-2">
+                  <CardTitle className="text-lg sm:text-xl shrink-0">
                     All ingredients ({filteredAndSortedIngredients.length}
                     {filteredAndSortedIngredients.length !== ingredients.length
                       ? ` of ${ingredients.length}`
                       : ""}
                   </CardTitle>
-                  <div className="flex items-center gap-2">
-                    <Button
-                      size="sm"
-                      className="h-9 min-h-[44px] gap-1.5 sm:min-h-0 shrink-0"
-                      onClick={openCreate}
-                    >
-                      <Plus className="size-4" />
-                      Add
-                    </Button>
-                    <div className="flex gap-1 rounded-lg border p-1 bg-slate-50 overflow-x-auto min-h-[44px] sm:min-h-0">
-                      <Button
-                        variant={viewMode === "table" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0"
-                        onClick={() => setViewMode("table")}
-                      >
-                        <List className="size-4" />
-                        <span className="sm:inline">Table</span>
-                      </Button>
-                      <Button
-                        variant={viewMode === "expandable" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0"
-                        onClick={() => setViewMode("expandable")}
-                      >
-                        <Rows3 className="size-4" />
-                        <span className="sm:inline">Expandable</span>
-                      </Button>
-                      <Button
-                        variant={viewMode === "cards" ? "secondary" : "ghost"}
-                        size="sm"
-                        className="h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0"
-                        onClick={() => setViewMode("cards")}
-                      >
-                        <LayoutGrid className="size-4" />
-                        <span className="sm:inline">Cards</span>
-                      </Button>
-                    </div>
-                  </div>
+                  <Button
+                    size="sm"
+                    className="h-9 min-h-[44px] gap-1.5 sm:min-h-0 shrink-0 ml-auto"
+                    onClick={openCreate}
+                  >
+                    <Plus className="size-4" />
+                    Add
+                  </Button>
                 </div>
-                <div className="flex flex-col gap-3">
-                  <div className="relative min-w-0">
+                <div className="flex gap-1 rounded-lg border p-1 bg-slate-50 overflow-x-auto min-h-[44px] sm:min-h-0 w-full sm:w-auto">
+                  <Button
+                    variant={viewMode === "table" ? "secondary" : "ghost"}
+                    size="sm"
+                    className={`h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0 ${viewMode === "table" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
+                    onClick={() => setViewMode("table")}
+                  >
+                    <List className="size-4" />
+                    <span className="sm:inline">Table</span>
+                  </Button>
+                  <Button
+                    variant={viewMode === "expandable" ? "secondary" : "ghost"}
+                    size="sm"
+                    className={`h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0 ${viewMode === "expandable" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
+                    onClick={() => setViewMode("expandable")}
+                  >
+                    <Rows3 className="size-4" />
+                    <span className="sm:inline">Expandable</span>
+                  </Button>
+                  <Button
+                    variant={viewMode === "cards" ? "secondary" : "ghost"}
+                    size="sm"
+                    className={`h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0 ${viewMode === "cards" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
+                    onClick={() => setViewMode("cards")}
+                  >
+                    <LayoutGrid className="size-4" />
+                    <span className="sm:inline">Cards</span>
+                  </Button>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 min-w-[140px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                     <Input
                       type="search"
                       placeholder="Search by name, category, store, notes…"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-9 h-9 min-h-[44px] sm:min-h-0"
+                      className="pl-9 h-9 min-h-[44px] sm:min-h-0 w-full"
                     />
                   </div>
-                  <div className="flex flex-wrap items-center gap-2">
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button
@@ -523,7 +520,6 @@ export default function AdminIngredientsPage() {
                         </div>
                       </PopoverContent>
                     </Popover>
-                  </div>
                 </div>
               </CardHeader>
             </Card>
@@ -539,11 +535,11 @@ export default function AdminIngredientsPage() {
             ) : viewMode === "table" ? (
               <Card>
                 <CardContent className="p-3 sm:pt-6 sm:px-6">
-                  <div className="overflow-x-auto -mx-3 sm:mx-0">
+                  <div className="overflow-x-auto -mx-3 sm:mx-0 pl-4 sm:pl-0">
                     <Table>
                       <TableHeader>
                         <TableRow>
-                          <TableHead>Name</TableHead>
+                          <TableHead className="pl-0">Name</TableHead>
                           <TableHead>Category</TableHead>
                           <TableHead>Unit</TableHead>
                           <TableHead>Store</TableHead>
@@ -554,7 +550,7 @@ export default function AdminIngredientsPage() {
                       <TableBody>
                         {filteredAndSortedIngredients.map((ing) => (
                           <TableRow key={ing._id} className="min-h-[48px]">
-                            <TableCell className="font-medium py-3">{ing.name}</TableCell>
+                            <TableCell className="font-medium py-3 pl-0">{ing.name}</TableCell>
                             <TableCell className="py-3">{ing.category}</TableCell>
                             <TableCell className="py-3">{ing.defaultUnit}</TableCell>
                             <TableCell className="py-3">{ing.storeName ?? "—"}</TableCell>
@@ -592,13 +588,13 @@ export default function AdminIngredientsPage() {
               </Card>
             ) : viewMode === "expandable" ? (
               <Card>
-                <CardContent className="p-3 sm:pt-6 sm:px-6">
-                  <Table>
+                <CardContent className="p-3 sm:pt-6 sm:px-6 overflow-hidden">
+                  <Table className="table-fixed w-full">
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-10" />
-                        <TableHead>Name</TableHead>
-                        <TableHead className="w-[100px] sm:w-[120px]">Actions</TableHead>
+                        <TableHead className="w-10 shrink-0" />
+                        <TableHead className="min-w-0">Name</TableHead>
+                        <TableHead className="w-[88px] shrink-0">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -610,15 +606,17 @@ export default function AdminIngredientsPage() {
                               className="cursor-pointer hover:bg-slate-50 min-h-[48px]"
                               onClick={() => toggleExpanded(ing._id)}
                             >
-                              <TableCell className="w-10 py-3">
+                              <TableCell className="w-10 py-3 shrink-0">
                                 {isExpanded ? (
                                   <ChevronDown className="size-4 text-slate-500" />
                                 ) : (
                                   <ChevronRight className="size-4 text-slate-500" />
                                 )}
                               </TableCell>
-                              <TableCell className="font-medium py-3">{ing.name}</TableCell>
-                              <TableCell className="py-2" onClick={(e) => e.stopPropagation()}>
+                              <TableCell className="font-medium py-3 min-w-0 break-words">
+                                {ing.name}
+                              </TableCell>
+                              <TableCell className="py-2 w-[88px] shrink-0" onClick={(e) => e.stopPropagation()}>
                                 <div className="flex items-center gap-0.5">
                                   <Button
                                     variant="ghost"

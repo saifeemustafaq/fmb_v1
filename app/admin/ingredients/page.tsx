@@ -43,6 +43,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
@@ -88,7 +94,7 @@ export default function AdminIngredientsPage() {
   const [formStockOnHand, setFormStockOnHand] = useState<string>("");
   const [formReorderThreshold, setFormReorderThreshold] = useState<string>("");
 
-  const [viewMode, setViewMode] = useState<ViewMode>("table");
+  const [viewMode, setViewMode] = useState<ViewMode>("expandable");
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -300,6 +306,7 @@ export default function AdminIngredientsPage() {
     "Spices (whole)",
     "Spices & masalas (ground)",
     "Uncategorized",
+    "Falanu"
   ];
   const categoryOptions =
     editing && formCategory && !ingredientCategories.includes(formCategory)
@@ -362,47 +369,67 @@ export default function AdminIngredientsPage() {
                     {filteredAndSortedIngredients.length !== ingredients.length
                       ? ` of ${ingredients.length}`
                       : ""}
+                    )
                   </CardTitle>
-                  <Button
-                    size="sm"
-                    className="h-9 min-h-[44px] gap-1.5 sm:min-h-0 shrink-0 ml-auto"
-                    onClick={openCreate}
-                  >
-                    <Plus className="size-4" />
-                    Add
-                  </Button>
-                </div>
-                <div className="flex gap-1 rounded-lg border p-1 bg-slate-50 overflow-x-auto min-h-[44px] sm:min-h-0 w-full sm:w-auto">
-                  <Button
-                    variant={viewMode === "table" ? "secondary" : "ghost"}
-                    size="sm"
-                    className={`h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0 ${viewMode === "table" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
-                    onClick={() => setViewMode("table")}
-                  >
-                    <List className="size-4" />
-                    <span className="sm:inline">Table</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === "expandable" ? "secondary" : "ghost"}
-                    size="sm"
-                    className={`h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0 ${viewMode === "expandable" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
-                    onClick={() => setViewMode("expandable")}
-                  >
-                    <Rows3 className="size-4" />
-                    <span className="sm:inline">Expandable</span>
-                  </Button>
-                  <Button
-                    variant={viewMode === "cards" ? "secondary" : "ghost"}
-                    size="sm"
-                    className={`h-9 min-w-[44px] gap-1.5 sm:h-8 shrink-0 ${viewMode === "cards" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
-                    onClick={() => setViewMode("cards")}
-                  >
-                    <LayoutGrid className="size-4" />
-                    <span className="sm:inline">Cards</span>
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <TooltipProvider delayDuration={300}>
+                      <div className="hidden sm:flex gap-1 rounded-lg border p-1 bg-slate-50 min-h-[44px] sm:min-h-0">
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={viewMode === "table" ? "secondary" : "ghost"}
+                              size="sm"
+                              className={`h-9 gap-1.5 sm:h-8 shrink-0 ${viewMode === "table" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
+                              onClick={() => setViewMode("table")}
+                            >
+                              <List className="size-4" />
+                              Table
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Table</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={viewMode === "expandable" ? "secondary" : "ghost"}
+                              size="sm"
+                              className={`h-9 gap-1.5 sm:h-8 shrink-0 ${viewMode === "expandable" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
+                              onClick={() => setViewMode("expandable")}
+                            >
+                              <Rows3 className="size-4" />
+                              Expandable
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Expandable</TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              variant={viewMode === "cards" ? "secondary" : "ghost"}
+                              size="sm"
+                              className={`h-9 gap-1.5 sm:h-8 shrink-0 ${viewMode === "cards" ? "bg-slate-700 text-white hover:bg-slate-800 hover:text-white" : ""}`}
+                              onClick={() => setViewMode("cards")}
+                            >
+                              <LayoutGrid className="size-4" />
+                              Cards
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>Cards</TooltipContent>
+                        </Tooltip>
+                      </div>
+                    </TooltipProvider>
+                    <Button
+                      size="sm"
+                      className="h-9 min-h-[44px] gap-1.5 sm:min-h-0 shrink-0"
+                      onClick={openCreate}
+                    >
+                      <Plus className="size-4" />
+                      Add
+                    </Button>
+                  </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative flex-1 min-w-[140px]">
+                  <div className="relative flex-1 min-w-[140px] order-first w-full sm:w-auto">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
                     <Input
                       type="search"
@@ -412,6 +439,56 @@ export default function AdminIngredientsPage() {
                       className="pl-9 h-9 min-h-[44px] sm:min-h-0 w-full"
                     />
                   </div>
+                  <TooltipProvider delayDuration={300}>
+                  <div className="sm:hidden relative flex h-10 w-28 rounded-lg border border-slate-200 bg-slate-100 p-1 shrink-0">
+                    <div
+                      className="absolute top-1 bottom-1 rounded-md bg-slate-700 shadow-sm transition-[left] duration-200 ease-out"
+                      style={{
+                        left: `calc(4px + (100% - 8px) / 3 * ${viewMode === "table" ? 0 : viewMode === "expandable" ? 1 : 2})`,
+                        width: "calc((100% - 8px) / 3)",
+                      }}
+                    />
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Table view"
+                          className={`relative z-10 flex h-full flex-1 min-w-0 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${viewMode === "table" ? "text-white" : "text-slate-600"}`}
+                          onClick={() => setViewMode("table")}
+                        >
+                          <List className="size-4 shrink-0" aria-hidden />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Table</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Expandable view"
+                          className={`relative z-10 flex h-full flex-1 min-w-0 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${viewMode === "expandable" ? "text-white" : "text-slate-600"}`}
+                          onClick={() => setViewMode("expandable")}
+                        >
+                          <Rows3 className="size-4 shrink-0" aria-hidden />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Expandable</TooltipContent>
+                    </Tooltip>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          aria-label="Cards view"
+                          className={`relative z-10 flex h-full flex-1 min-w-0 items-center justify-center rounded-md transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-slate-400 ${viewMode === "cards" ? "text-white" : "text-slate-600"}`}
+                          onClick={() => setViewMode("cards")}
+                        >
+                          <LayoutGrid className="size-4 shrink-0" aria-hidden />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>Cards</TooltipContent>
+                    </Tooltip>
+                  </div>
+                    </TooltipProvider>
                     <Popover>
                       <PopoverTrigger asChild>
                         <Button

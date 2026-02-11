@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, UtensilsCrossed } from "lucide-react";
+import { Home, UtensilsCrossed, Store, Users } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -75,6 +75,26 @@ export function AppSidebar() {
                 icon={UtensilsCrossed}
               >
                 Ingredients
+              </NavLink>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <NavLink
+                href="/admin/stores"
+                isActive={pathname === "/admin/stores"}
+                tooltip="Stores"
+                icon={Store}
+              >
+                Stores
+              </NavLink>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
+              <NavLink
+                href="/admin/users"
+                isActive={pathname === "/admin/users" || pathname?.startsWith("/admin/users/")}
+                tooltip="Users"
+                icon={Users}
+              >
+                Users
               </NavLink>
             </SidebarMenuItem>
           </SidebarMenu>

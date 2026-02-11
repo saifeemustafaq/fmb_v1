@@ -217,6 +217,85 @@ export async function getStoresList(): Promise<{ _id: ObjectId; name: string }[]
 }
 
 /**
+ * Get all stores for admin (full documents)
+ */
+export async function getStoresForAdmin() {
+  const stores = await getStoresCollection();
+  const list = await stores.find({}).sort({ name: 1 }).toArray();
+  return list as { _id: ObjectId; name: string; address?: string; notes?: string; isActive?: boolean; createdAt?: Date }[];
+}
+
+/**
+ * Get a single store by ID
+ */
+export async function getStoreById(storeId: ObjectId | string) {
+  const stores = await getStoresCollection();
+  const id = typeof storeId === "string" ? new ObjectId(storeId) : storeId;
+  return stores.findOne({ _id: id }) as Promise<{
+    _id: ObjectId;
+    name: string;
+    address?: string;
+    notes?: string;
+    isActive?: boolean;
+    createdAt?: Date;
+  } | null>;
+}
+
+/**
+ * Create a new store (admin only)
+ */
+export async function createStore(data: {
+  name: string;
+  address?: string;
+  notes?: string;
+  isActive?: boolean;
+}) {
+  const stores = await getStoresCollection();
+  const doc = {
+    name: data.name.trim(),
+    address: (data.address ?? "").trim() || undefined,
+    notes: (data.notes ?? "").trim() || undefined,
+    isActive: data.isActive ?? true,
+    createdAt: new Date(),
+  };
+  const result = await stores.insertOne(doc);
+  return { _id: result.insertedId, ...doc };
+}
+
+/**
+ * Update a store by ID (admin only)
+ */
+export async function updateStore(
+  storeId: ObjectId | string,
+  updates: { name?: string; address?: string; notes?: string; isActive?: boolean }
+) {
+  const stores = await getStoresCollection();
+  const id = typeof storeId === "string" ? new ObjectId(storeId) : storeId;
+  const set: Record<string, unknown> = {};
+  if (updates.name !== undefined) set.name = updates.name.trim();
+  if (updates.address !== undefined) set.address = updates.address.trim() || "";
+  if (updates.notes !== undefined) set.notes = updates.notes.trim() || "";
+  if (updates.isActive !== undefined) set.isActive = updates.isActive;
+  if (Object.keys(set).length === 0) return getStoreById(id);
+  const result = await stores.findOneAndUpdate(
+    { _id: id },
+    { $set: set },
+    { returnDocument: "after" }
+  );
+  return result as { _id: ObjectId; name: string; address?: string; notes?: string; isActive?: boolean; createdAt?: Date } | null;
+}
+
+/**
+ * Delete a store by ID (admin only)
+ */
+export async function deleteStore(storeId: ObjectId | string) {
+  const stores = await getStoresCollection();
+  const id = typeof storeId === "string" ? new ObjectId(storeId) : storeId;
+  const result = await stores.deleteOne({ _id: id });
+  return result.deletedCount === 1;
+}
+
+/**
  * Update an ingredient by ID (admin only)
  *
  * @param ingredientId - The ingredient to update

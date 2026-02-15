@@ -3,14 +3,20 @@
 import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ChevronLeft, FileText, Download, ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronLeft, FileText, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CartItemsList, type CartItemDisplay } from "@/components/admin/cart-items-list";
 import { CartDetailModal } from "@/components/admin/cart-detail-modal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type WeekPlanDetail = {
   _id: string;
@@ -77,8 +83,7 @@ export default function AdminWeekPlanDetailPage() {
   const [combinedItems, setCombinedItems] = useState<CartItemDisplay[] | null>(null);
   const [cartItemsByCartId, setCartItemsByCartId] = useState<Record<string, CartItemDisplay[]>>({});
   const [loadingCartId, setLoadingCartId] = useState<string | null>(null);
-  const [cartTabValue, setCartTabValue] = useState<string>("combined");
-  const [viewMoreOpen, setViewMoreOpen] = useState(false);
+  const [expandedCartId, setExpandedCartId] = useState<string | null>(null);
   const [stores, setStores] = useState<{ _id: string; name: string }[]>([]);
   const [cookNameById, setCookNameById] = useState<Record<string, string>>({});
   const [combinedItemsRaw, setCombinedItemsRaw] = useState<Array<{ nameSnapshot: string; quantityRequested: number; unit: string; categorySnapshot?: string; storeIdSnapshot?: string | null }>>([]);
@@ -178,15 +183,6 @@ export default function AdminWeekPlanDetailPage() {
     fetchCombined();
   }, [id]);
 
-  useEffect(() => {
-    if (viewMoreOpen && stores.length === 0) {
-      fetch("/api/admin/stores")
-        .then((res) => (res.ok ? res.json() : { stores: [] }))
-        .then((data) => setStores(data.stores ?? []))
-        .catch(() => setStores([]));
-    }
-  }, [viewMoreOpen, stores.length]);
-
   const requestedCartIdsRef = useRef<Set<string>>(new Set());
   const fetchCartItems = useCallback(async (cartId: string) => {
     if (requestedCartIdsRef.current.has(cartId)) return;
@@ -214,23 +210,32 @@ export default function AdminWeekPlanDetailPage() {
     }
   }, []);
 
-  useEffect(() => {
-    if (cartTabValue && cartTabValue !== "combined") {
-      fetchCartItems(cartTabValue);
-    }
-  }, [cartTabValue, fetchCartItems]);
-
   const formatDate = (d: string) =>
     new Date(d).toISOString().slice(0, 10);
 
-  const storeNameById = new Map(stores.map((s) => [s._id, s.name]));
-  const downloadCombinedCsv = () => {
+  const fetchStoresIfNeeded = useCallback(async (): Promise<Array<{ _id: string; name: string }>> => {
+    if (stores.length > 0) return stores;
+    try {
+      const res = await fetch("/api/admin/stores");
+      if (!res.ok) return [];
+      const data = await res.json();
+      const fetchedStores = data.stores ?? [];
+      setStores(fetchedStores);
+      return fetchedStores;
+    } catch {
+      return [];
+    }
+  }, [stores]);
+
+  const downloadCombinedCsv = async () => {
+    const storesForCsv = await fetchStoresIfNeeded();
+    const storeNameById = new Map(storesForCsv.map((s: { _id: string; name: string }) => [s._id, s.name]));
     const header = "Name,Category,Store,Quantity,Unit";
     const rows = combinedItemsRaw.map((item) => {
       const storeName = item.storeIdSnapshot ? storeNameById.get(item.storeIdSnapshot) ?? "" : "";
       const name = `"${(item.nameSnapshot ?? "").replace(/"/g, '""')}"`;
       const category = `"${(item.categorySnapshot ?? "").replace(/"/g, '""')}"`;
-      const store = `"${storeName.replace(/"/g, '""')}"`;
+      const store = `"${String(storeName).replace(/"/g, '""')}"`;
       return [name, category, store, item.quantityRequested, item.unit].join(",");
     });
     const csv = [header, ...rows].join("\n");
@@ -275,6 +280,20 @@ export default function AdminWeekPlanDetailPage() {
       ? `${formatShortDate(firstDate)} - ${formatShortDate(lastDate)}`
       : formatDate(plan.weekStartDate);
   const defaultCookName = cookNameById[plan.assignedCookId] ?? "Unknown cook";
+  const assignedCookIds = Array.from(
+    new Set(plan.days.map((day) => day.assignedCookId ?? plan.assignedCookId))
+  );
+  const cartByCookId = new Map(carts.map((cart) => [cart.cookId, cart]));
+  const submittedCookCount = assignedCookIds.filter((cookId) => {
+    const cart = cartByCookId.get(cookId);
+    return cart?.status === "submitted" || cart?.status === "finalized";
+  }).length;
+  const pendingCookCount = Math.max(0, assignedCookIds.length - submittedCookCount);
+  const perCookRows = assignedCookIds.map((cookId) => ({
+    cookId,
+    cookName: cookNameById[cookId] ?? cartByCookId.get(cookId)?.cookName ?? "Unknown cook",
+    cart: cartByCookId.get(cookId) ?? null,
+  }));
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900">
@@ -376,141 +395,162 @@ export default function AdminWeekPlanDetailPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Carts</CardTitle>
+              <div className="flex items-start justify-between gap-3">
+                <CardTitle className="text-lg">Carts</CardTitle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="default" size="sm" className="shrink-0">
+                      <Download className="mr-2 h-4 w-4" />
+                      Download
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      onSelect={(e) => {
+                        e.preventDefault();
+                        void downloadCombinedCsv();
+                      }}
+                      disabled={combinedItemsRaw.length === 0}
+                    >
+                      Download Combined CSV
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href={`/admin/week-plans/${id}/combined-pdf?groupBy=category`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Download Combined PDF (by category)
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem asChild>
+                      <Link
+                        href={`/admin/week-plans/${id}/combined-pdf?groupBy=store`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        Download Combined PDF (by store)
+                      </Link>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    {carts.map((cart) => (
+                      <DropdownMenuItem key={cart._id} asChild>
+                        <Link href={`/admin/carts/${cart._id}`}>
+                          Download from {cart.cookName}&apos;s cart page
+                        </Link>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
               <CardDescription>
-                One cart per cook; combined view and per-cook tabs
+                Track submissions and review combined or individual carts
               </CardDescription>
             </CardHeader>
             <CardContent>
+              <div className="mb-4 flex flex-wrap gap-2">
+                <Badge variant="outline" className="border-emerald-300 bg-emerald-50 text-emerald-800">
+                  Submitted: {submittedCookCount}/{assignedCookIds.length}
+                </Badge>
+                <Badge variant="outline" className="border-amber-300 bg-amber-50 text-amber-800">
+                  Yet to submit: {pendingCookCount}
+                </Badge>
+              </div>
+
               {carts.length === 0 && combinedItems !== null && combinedItems.length === 0 ? (
                 <p className="text-sm text-slate-600">No carts created yet. Cooks will create carts when they open &quot;Build cart&quot;.</p>
               ) : (
-                <Tabs value={cartTabValue} onValueChange={setCartTabValue} className="w-full">
-                  <TabsList className="mb-4 flex w-full flex-wrap gap-1">
-                    <TabsTrigger value="combined">Combined cart</TabsTrigger>
-                    {carts.map((cart) => (
-                      <TabsTrigger key={cart._id} value={cart._id}>
-                        {cart.cookName}&apos;s cart
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
-                  <TabsContent value="combined" className="mt-0">
-                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                      <h3 className="mb-3 font-semibold text-slate-900">Combined shopping list</h3>
-                      {combinedItems === null ? (
-                        <p className="text-sm text-slate-600">Loading…</p>
-                      ) : (
-                        <CartItemsList
-                          items={combinedItems}
-                          emptyMessage="No items in any cart yet."
-                          itemKeyPrefix="combined"
-                        />
-                      )}
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="mt-3"
-                        onClick={() => setViewMoreOpen((v) => !v)}
-                      >
-                        {viewMoreOpen ? (
-                          <>
-                            <ChevronUp className="mr-2 h-4 w-4" />
-                            View less
-                          </>
-                        ) : (
-                          <>
-                            <ChevronDown className="mr-2 h-4 w-4" />
-                            View More
-                          </>
-                        )}
-                      </Button>
-                      {viewMoreOpen && (
-                        <div className="mt-4 space-y-3 border-t border-slate-200 pt-4">
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={downloadCombinedCsv}
-                              disabled={combinedItemsRaw.length === 0}
+                <div className="space-y-4">
+                  <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+                    <h3 className="mb-3 font-semibold text-slate-900">Combined shopping list</h3>
+                    {combinedItems === null ? (
+                      <p className="text-sm text-slate-600">Loading…</p>
+                    ) : (
+                      <CartItemsList
+                        items={combinedItems}
+                        emptyMessage="No items in any cart yet."
+                        itemKeyPrefix="combined"
+                      />
+                    )}
+                  </div>
+
+                  <div className="rounded-lg border border-slate-200 bg-white p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <h3 className="font-semibold text-slate-900">Individual cook carts</h3>
+                      <span className="text-xs text-slate-500">
+                        {perCookRows.length} cook{perCookRows.length === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <div className="space-y-3">
+                      {perCookRows.map(({ cookId, cookName, cart }) => (
+                        <div key={cookId} className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="font-medium text-slate-900">{cookName}</p>
+                            <Badge
+                              variant={
+                                !cart
+                                  ? "outline"
+                                  : cart.status === "submitted"
+                                    ? "default"
+                                    : cart.status === "finalized"
+                                      ? "secondary"
+                                      : "outline"
+                              }
                             >
-                              <Download className="mr-2 h-4 w-4" />
-                              Download as CSV
-                            </Button>
-                            <Button variant="secondary" size="sm" asChild>
-                              <Link href={`/admin/week-plans/${id}/combined-pdf?groupBy=category`} target="_blank" rel="noopener noreferrer">
-                                <FileText className="mr-2 h-4 w-4" />
-                                Download PDF (by category)
-                              </Link>
-                            </Button>
-                            <Button variant="secondary" size="sm" asChild>
-                              <Link href={`/admin/week-plans/${id}/combined-pdf?groupBy=store`} target="_blank" rel="noopener noreferrer">
-                                <FileText className="mr-2 h-4 w-4" />
-                                Download PDF (by store)
-                              </Link>
-                            </Button>
+                              {!cart ? "not started" : cart.status}
+                            </Badge>
                           </div>
-                          {carts.length > 0 && (
-                            <div>
-                              <p className="mb-2 text-xs font-medium text-slate-500">Per-cook carts</p>
+                          {!cart ? (
+                            <p className="mt-2 text-sm text-slate-600">Cart not created yet.</p>
+                          ) : (
+                            <div className="mt-3 space-y-3">
                               <div className="flex flex-wrap gap-2">
-                                {carts.map((cart) => (
-                                  <Button
-                                    key={cart._id}
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => {
-                                      setSelectedCartId(cart._id);
-                                      setModalOpen(true);
-                                    }}
-                                  >
-                                    View {cart.cookName}&apos;s cart
-                                  </Button>
-                                ))}
+                                <Button variant="outline" size="sm" asChild>
+                                  <Link href={`/admin/carts/${cart._id}`}>View full cart</Link>
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setSelectedCartId(cart._id);
+                                    setModalOpen(true);
+                                  }}
+                                >
+                                  Quick view
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => {
+                                    if (expandedCartId === cart._id) {
+                                      setExpandedCartId(null);
+                                      return;
+                                    }
+                                    setExpandedCartId(cart._id);
+                                    fetchCartItems(cart._id);
+                                  }}
+                                >
+                                  {expandedCartId === cart._id ? "Hide inline items" : "Show inline items"}
+                                </Button>
                               </div>
+                              {expandedCartId === cart._id && (
+                                loadingCartId === cart._id ? (
+                                  <p className="text-sm text-slate-600">Loading…</p>
+                                ) : (
+                                  <CartItemsList
+                                    items={cartItemsByCartId[cart._id] ?? []}
+                                    emptyMessage="No items in this cart yet."
+                                    itemKeyPrefix={cart._id}
+                                  />
+                                )
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
+                      ))}
                     </div>
-                  </TabsContent>
-                  {carts.map((cart) => (
-                    <TabsContent key={cart._id} value={cart._id} className="mt-0">
-                      <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-                        <div className="mb-3 flex items-center justify-between">
-                          <h3 className="font-semibold text-slate-900">{cart.cookName}&apos;s cart</h3>
-                          <Badge
-                            variant={
-                              cart.status === "submitted"
-                                ? "default"
-                                : cart.status === "finalized"
-                                  ? "secondary"
-                                  : "outline"
-                            }
-                          >
-                            {cart.status}
-                          </Badge>
-                        </div>
-                        {loadingCartId === cart._id ? (
-                          <p className="text-sm text-slate-600">Loading…</p>
-                        ) : (
-                          <>
-                            <CartItemsList
-                              items={cartItemsByCartId[cart._id] ?? []}
-                              emptyMessage="No items in this cart yet."
-                              itemKeyPrefix={cart._id}
-                            />
-                            <Link
-                              href={`/admin/carts/${cart._id}`}
-                              className="mt-3 inline-block text-sm text-primary underline"
-                            >
-                              View full cart
-                            </Link>
-                          </>
-                        )}
-                      </div>
-                    </TabsContent>
-                  ))}
-                </Tabs>
+                  </div>
+                </div>
               )}
             </CardContent>
           </Card>

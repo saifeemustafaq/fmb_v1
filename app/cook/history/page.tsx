@@ -14,6 +14,7 @@ type CartListItem = {
   weekPlanId: string;
   status: "draft" | "submitted" | "finalized";
   itemCount: number;
+  weekName?: string | null;
   weekStartDate: string | null;
   createdAt: string;
   updatedAt: string;
@@ -62,7 +63,8 @@ export default function CookHistoryPage() {
     });
   };
 
-  const formatWeekLabel = (weekStartDate: string | null) => {
+  const formatWeekLabel = (weekName: string | null | undefined, weekStartDate: string | null) => {
+    if (weekName && weekName.trim()) return weekName;
     if (!weekStartDate) return "Unknown week";
     const d = new Date(weekStartDate);
     return `Week of ${d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}`;
@@ -78,6 +80,19 @@ export default function CookHistoryPage() {
         return "outline";
       default:
         return "secondary";
+    }
+  };
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case "draft":
+        return "Draft";
+      case "submitted":
+        return "Submitted";
+      case "finalized":
+        return "Finalized";
+      default:
+        return status;
     }
   };
 
@@ -100,18 +115,18 @@ export default function CookHistoryPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-              Cart History
+              Cart history
             </h1>
             <p className="text-base text-slate-600">
-              All your drafted and submitted carts
+              View your past carts and shopping lists
             </p>
           </div>
         </div>
 
         {error && (
-          <Card className="mb-4 border-red-200 bg-red-50">
+          <Card className="mb-4 border-red-200 bg-red-50" role="alert">
             <CardContent className="py-4">
-              <p className="text-sm text-red-700">{error}</p>
+              <p className="text-base text-red-700">{error}</p>
             </CardContent>
           </Card>
         )}
@@ -128,7 +143,11 @@ export default function CookHistoryPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <Button asChild size="lg" className="w-full h-12">
+              <Button
+                asChild
+                size="lg"
+                className="w-full min-h-[48px] h-12 text-base"
+              >
                 <Link href="/cook">Go to Dashboard</Link>
               </Button>
             </CardContent>
@@ -143,10 +162,13 @@ export default function CookHistoryPage() {
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <CardTitle className="text-lg flex items-center gap-2">
                           <ShoppingCart className="h-5 w-5 text-slate-500" />
-                          {formatWeekLabel(cart.weekStartDate)}
+                          {formatWeekLabel(cart.weekName, cart.weekStartDate)}
                         </CardTitle>
-                        <Badge variant={statusVariant(cart.status)}>
-                          {cart.status}
+                        <Badge
+                          variant={statusVariant(cart.status)}
+                          className="text-sm font-medium"
+                        >
+                          {statusLabel(cart.status)}
                         </Badge>
                       </div>
                       <CardDescription>
@@ -166,7 +188,12 @@ export default function CookHistoryPage() {
         )}
 
         <div className="mt-6">
-          <Button asChild variant="outline" size="lg" className="w-full h-12">
+          <Button
+            asChild
+            variant="outline"
+            size="lg"
+            className="w-full min-h-[48px] h-12 text-base"
+          >
             <Link href="/cook">Back to Dashboard</Link>
           </Button>
         </div>

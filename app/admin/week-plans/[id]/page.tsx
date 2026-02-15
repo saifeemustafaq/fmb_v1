@@ -15,6 +15,7 @@ import { CartDetailModal } from "@/components/admin/cart-detail-modal";
 type WeekPlanDetail = {
   _id: string;
   weekStartDate: string;
+  name?: string;
   assignedCookId: string;
   days: Array<{
     date: string;
@@ -37,12 +38,35 @@ type CartSummary = {
   updatedAt: string;
 };
 
+type CookSummary = {
+  _id: string;
+  name: string;
+  role: string;
+};
+
 const dayTypeLabel: Record<string, string> = {
   no_thali: "No thali",
   thali: "Thali",
   jamaat_wide_thali: "Jamaat wide thali",
   miqaat: "Miqaat",
 };
+
+function formatLongDate(date: string) {
+  return new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  });
+}
+
+function formatShortDate(date: string) {
+  return new Date(date + "T12:00:00").toLocaleDateString("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+  });
+}
 
 export default function AdminWeekPlanDetailPage() {
   const params = useParams();
@@ -56,6 +80,7 @@ export default function AdminWeekPlanDetailPage() {
   const [cartTabValue, setCartTabValue] = useState<string>("combined");
   const [viewMoreOpen, setViewMoreOpen] = useState(false);
   const [stores, setStores] = useState<{ _id: string; name: string }[]>([]);
+  const [cookNameById, setCookNameById] = useState<Record<string, string>>({});
   const [combinedItemsRaw, setCombinedItemsRaw] = useState<Array<{ nameSnapshot: string; quantityRequested: number; unit: string; categorySnapshot?: string; storeIdSnapshot?: string | null }>>([]);
   const [selectedCartId, setSelectedCartId] = useState<string | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -81,6 +106,27 @@ export default function AdminWeekPlanDetailPage() {
     };
     fetchPlan();
   }, [id]);
+
+  useEffect(() => {
+    const fetchCooks = async () => {
+      try {
+        const res = await fetch("/api/admin/users?role=cook");
+        if (!res.ok) return;
+        const data = await res.json();
+        const users: CookSummary[] = Array.isArray(data.users) ? data.users : [];
+        const map: Record<string, string> = {};
+        for (const user of users) {
+          if (user.role === "cook") {
+            map[user._id] = user.name;
+          }
+        }
+        setCookNameById(map);
+      } catch (err) {
+        console.error(err);
+      }
+    };
+    fetchCooks();
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -219,11 +265,21 @@ export default function AdminWeekPlanDetailPage() {
   }
 
   const isSingleDay = plan.days.length === 1;
+  const firstDate = plan.days[0]?.date;
+  const lastDate = plan.days[plan.days.length - 1]?.date;
+  const planDateLabel = isSingleDay
+    ? firstDate
+      ? formatLongDate(firstDate)
+      : formatDate(plan.weekStartDate)
+    : firstDate && lastDate
+      ? `${formatShortDate(firstDate)} - ${formatShortDate(lastDate)}`
+      : formatDate(plan.weekStartDate);
+  const defaultCookName = cookNameById[plan.assignedCookId] ?? "Unknown cook";
 
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900">
       <div className="mx-auto w-full max-w-4xl">
-        <div className="mb-6 flex items-center gap-4">
+        <div className="mb-4 flex items-center gap-4">
           <Button variant="ghost" size="icon" asChild>
             <Link href="/admin/week-plans" className="h-12 w-12">
               <ChevronLeft className="h-6 w-6" />
@@ -231,58 +287,89 @@ export default function AdminWeekPlanDetailPage() {
           </Button>
           <div>
             <h1 className="text-2xl font-bold text-slate-900">
-              {isSingleDay ? "Single-day plan" : "Week plan"}
+              {plan.name?.trim() || (isSingleDay ? "Single-day plan" : "Week plan")}
             </h1>
-            <p className="text-sm text-slate-600">
-              {plan.days[0]?.date
-                ? new Date(plan.days[0].date + "T12:00:00").toLocaleDateString("en-US", {
-                    weekday: "long",
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                  })
-                : formatDate(plan.weekStartDate)}
-            </p>
+            <p className="text-sm text-slate-600">{planDateLabel}</p>
           </div>
         </div>
 
         <div className="space-y-6">
           <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-lg">Plan overview</CardTitle>
+              <CardDescription>Quick summary of plan type, range, and default cook</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                <Badge variant={isSingleDay ? "secondary" : "default"}>
+                  {isSingleDay ? "Single-day" : "Full-week"}
+                </Badge>
+                <Badge variant="outline">
+                  {plan.days.length} day{plan.days.length === 1 ? "" : "s"}
+                </Badge>
+                <Badge variant="outline">Default cook: {defaultCookName}</Badge>
+              </div>
+              {plan.notes?.trim() && (
+                <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
+                  <span className="font-medium text-slate-900">Notes:</span> {plan.notes}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+          <Card>
             <CardHeader>
               <CardTitle className="text-lg">Days</CardTitle>
-              <CardDescription>Day type, headcount, menu, assigned cook</CardDescription>
+              <CardDescription>Cook assignment, service type, headcount, and menu by day</CardDescription>
             </CardHeader>
             <CardContent>
               <ul className="space-y-4">
-                {plan.days.map((day, i) => (
+                {plan.days.map((day) => {
+                  const effectiveCookId = day.assignedCookId ?? plan.assignedCookId;
+                  const isOverride =
+                    !!day.assignedCookId && day.assignedCookId !== plan.assignedCookId;
+                  const cookName = cookNameById[effectiveCookId] ?? "Unknown cook";
+                  return (
                   <li
                     key={day.date}
-                    className="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 pb-4 last:border-0 last:pb-0"
+                    className="rounded-xl border border-slate-200 bg-white p-4"
                   >
-                    <div>
-                      <span className="font-medium text-slate-900">
-                        {new Date(day.date + "T12:00:00").toLocaleDateString("en-US", {
-                          weekday: "long",
-                          month: "short",
-                          day: "numeric",
-                        })}
-                      </span>
-                      <Badge variant="secondary" className="ml-2">
-                        {dayTypeLabel[day.dayType] ?? day.dayType}
-                      </Badge>
-                    </div>
-                    {day.dayType !== "no_thali" && (
-                      <div className="text-sm text-slate-600">
-                        Headcount: {day.headcount}
-                        {day.menuItems.length > 0 && (
-                          <span className="ml-2">
-                            · {day.menuItems.join(", ")}
-                          </span>
-                        )}
+                    <div className="w-full space-y-3">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-base font-semibold text-slate-900">
+                          {formatLongDate(day.date)}
+                        </span>
+                        <Badge variant="secondary">
+                          {dayTypeLabel[day.dayType] ?? day.dayType}
+                        </Badge>
                       </div>
-                    )}
+
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">Cook: {cookName}</Badge>
+                        <Badge variant="outline">
+                          {isOverride ? "Day override" : "Default cook"}
+                        </Badge>
+                      </div>
+
+                      {day.dayType !== "no_thali" ? (
+                        <div className="space-y-2 text-sm text-slate-700">
+                          <p>
+                            <span className="font-medium text-slate-900">Headcount:</span>{" "}
+                            {day.headcount}
+                          </p>
+                          <p>
+                            <span className="font-medium text-slate-900">Menu:</span>{" "}
+                            {day.menuItems.length > 0 ? day.menuItems.join(", ") : "No menu items"}
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">
+                          No service on this day.
+                        </div>
+                      )}
+                    </div>
                   </li>
-                ))}
+                  );
+                })}
               </ul>
             </CardContent>
           </Card>

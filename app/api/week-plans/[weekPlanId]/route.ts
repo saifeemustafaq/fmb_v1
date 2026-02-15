@@ -5,7 +5,9 @@ import { z } from "zod";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import {
+  countPlansForWeek,
   getWeekPlanById,
+  normalizeToMonday,
   updateWeekPlan,
   serializeWeekPlanForResponse,
   getDaysForCook,
@@ -36,7 +38,15 @@ const updateWeekPlanSchema = z.object({
     .string()
     .refine((id) => ObjectId.isValid(id), { message: "Invalid assignedCookId" })
     .optional(),
-  days: z.array(daySchema).min(1).max(7).optional(),
+  name: z.string().optional(),
+  days: z
+    .array(daySchema)
+    .min(1)
+    .max(7)
+    .refine((days) => days.length === 1 || days.length === 7, {
+      message: "Plan must be either single-day (1 day) or full-week (7 days)",
+    })
+    .optional(),
   notes: z.string().optional(),
 });
 
@@ -121,11 +131,57 @@ export async function PATCH(
     }
 
     const updates: Record<string, unknown> = {};
+    const shouldRevalidateWeekRules =
+      parsed.data.weekStartDate != null || parsed.data.days != null;
+
+    if (shouldRevalidateWeekRules) {
+      const effectiveDays =
+        parsed.data.days ??
+        plan.days.map((d) => ({
+          date:
+            d.date instanceof Date ? d.date.toISOString().slice(0, 10) : String(d.date),
+          dayType: d.dayType,
+          headcount: d.headcount,
+          menuItems: d.menuItems,
+          assignedCookId: d.assignedCookId?.toString(),
+        }));
+      const isSingleDay = effectiveDays.length === 1;
+      const anchorDate = isSingleDay
+        ? new Date(effectiveDays[0].date)
+        : parsed.data.weekStartDate != null
+          ? new Date(parsed.data.weekStartDate)
+          : plan.weekStartDate;
+      const normalizedMonday = normalizeToMonday(anchorDate);
+      const { fullWeekCount, singleDayCount } = await countPlansForWeek(
+        normalizedMonday,
+        new ObjectId(weekPlanId)
+      );
+
+      if (!isSingleDay && fullWeekCount >= 1) {
+        return NextResponse.json(
+          { error: "A full-week plan already exists for this week." },
+          { status: 409 }
+        );
+      }
+      if (isSingleDay && singleDayCount >= 6) {
+        return NextResponse.json(
+          { error: "Only 6 single-day plans are allowed per week." },
+          { status: 409 }
+        );
+      }
+    }
+
     if (parsed.data.weekStartDate != null) {
-      updates.weekStartDate = new Date(parsed.data.weekStartDate);
+      updates.weekStartDate = normalizeToMonday(new Date(parsed.data.weekStartDate));
     }
     if (parsed.data.assignedCookId != null) {
       updates.assignedCookId = new ObjectId(parsed.data.assignedCookId);
+    }
+    if (parsed.data.name !== undefined) {
+      const trimmedName = parsed.data.name.trim();
+      if (trimmedName) {
+        updates.name = trimmedName;
+      }
     }
     if (parsed.data.days != null) {
       updates.days = parsed.data.days.map((d) => ({

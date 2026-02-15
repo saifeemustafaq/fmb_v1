@@ -1,25 +1,13 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { IngredientPicker } from "@/components/ui/ingredient-picker";
 import { CartItemsList, type CartItem } from "@/components/ui/cart-items-list";
-import { AddMissingIngredientForm } from "@/components/ui/add-missing-ingredient-form";
-import {
-	Sheet,
-	SheetContent,
-	SheetHeader,
-	SheetTitle,
-} from "@/components/ui/sheet";
 import { Spinner } from "@/components/ui/spinner";
-import { Plus, ShoppingCart, X } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import {
-	WeekMenuSummary,
-	type WeekMenuDay,
-} from "@/components/cook/week-menu-summary";
+import { DraftCartBuilder, type DraftWeekPlan } from "@/components/cook/draft-cart-builder";
 import type { IngredientRecord } from "@/lib/interfaces/ingredient";
 
 export default function NewCartPage() {
@@ -32,17 +20,7 @@ export default function NewCartPage() {
 	const [unit, setUnit] = useState("");
 	const [cartId, setCartId] = useState<string | null>(null);
 	const [weekPlanId, setWeekPlanId] = useState<string | null>(null);
-	const [weekPlan, setWeekPlan] = useState<{
-		_id: string;
-		assignedCookId: string;
-		days: Array<{
-			date: string;
-			dayType?: string;
-			headcount?: number;
-			menuItems?: string[];
-			assignedCookId: string | null;
-		}>;
-	} | null>(null);
+	const [weekPlan, setWeekPlan] = useState<DraftWeekPlan | null>(null);
 	const [userId, setUserId] = useState<string | null>(null);
 	const [showAddMissing, setShowAddMissing] = useState(false);
 	const [showCartSheet, setShowCartSheet] = useState(false);
@@ -281,7 +259,7 @@ export default function NewCartPage() {
 
 			if (!res.ok) throw new Error("Failed to submit cart");
 
-			router.push("/cook");
+			router.push("/cook?submitted=1");
 		} catch (err) {
 			console.error(err);
 			setError("Failed to submit cart");
@@ -297,20 +275,20 @@ export default function NewCartPage() {
 		);
 	}
 
-	if (error && !weekPlanId) {
+		if (error && !weekPlanId) {
 		return (
 			<main className="min-h-screen bg-white px-4 py-6">
 				<div className="mx-auto max-w-2xl">
-					<Card className="border-red-200 bg-red-50">
+					<Card className="border-red-200 bg-red-50" role="alert">
 						<CardContent className="py-8 text-center">
 							<p className="text-base text-red-700">{error}</p>
 							<Button
 								asChild
 								variant="outline"
 								size="lg"
-								className="mt-4 h-14"
+								className="mt-4 min-h-[48px] h-14 text-base focus-visible:ring-2 focus-visible:ring-offset-2"
 							>
-								<a href="/cook">Back to Dashboard</a>
+								<Link href="/cook">Back to Dashboard</Link>
 							</Button>
 						</CardContent>
 					</Card>
@@ -319,295 +297,59 @@ export default function NewCartPage() {
 		);
 	}
 
+	const title = weekPlan
+		? weekPlan.name?.trim()
+			? `Cart — ${weekPlan.name}`
+			: weekPlan.days.length === 1
+				? "Cart — Single-day plan"
+				: weekPlan.weekStartDate
+					? `Cart — Week of ${new Date(weekPlan.weekStartDate).toLocaleDateString("en-US", { month: "short", day: "numeric" })}`
+					: "Build Cart"
+		: "Build Cart";
+
 	return (
-		<main className="flex min-h-screen flex-col bg-white text-slate-900">
-			<div className="mx-auto flex w-full max-w-4xl flex-1 flex-col min-h-0 px-4 py-4 sm:py-6">
-				{/* Header */}
-				<div className="shrink-0 mb-4 flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
-					<div>
-						<div className="flex items-center justify-between gap-3">
-							<h1 className="text-2xl font-bold text-slate-900 sm:text-3xl">
-								Build Cart
-							</h1>
-							<button
-								type="button"
-								onClick={() => setShowCartSheet(true)}
-								className="self-start sm:self-center flex items-center justify-center gap-2 h-11 min-w-11 px-3 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2 transition-colors"
-								aria-label={`Your cart, ${cartItems.length} ${cartItems.length === 1 ? "item" : "items"}. Click to open.`}
-							>
-								<ShoppingCart className="h-5 w-5 shrink-0" />
-								<span className="text-sm font-semibold tabular-nums">
-									{cartItems.length}
-								</span>
-							</button>
-						</div>
-						<p className="mt-2 text-base text-slate-700">
-							Search and add ingredients for this cart
-						</p>
-					</div>
-				</div>
-
-				{/* This week you're cooking */}
-				{weekPlan &&
-					userId &&
-					(() => {
-						const defaultCookId = weekPlan.assignedCookId;
-						const myDays: WeekMenuDay[] = weekPlan.days
-							.filter((day) => {
-								const effective =
-									day.assignedCookId ?? defaultCookId;
-								return effective === userId;
-							})
-							.map((d) => ({
-								date: d.date,
-								dayType: d.dayType ?? "thali",
-								headcount: d.headcount ?? 0,
-								menuItems: d.menuItems ?? [],
-								assignedCookId: d.assignedCookId,
-							}));
-						if (myDays.length === 0) return null;
-						return (
-							<div className="shrink-0 mb-4">
-								<WeekMenuSummary
-									days={myDays}
-									collapsible
-									defaultOpen
-									compact={false}
-								/>
-							</div>
-						);
-					})()}
-
-				{/* Error Alert */}
-				{error && (
-					<div className="shrink-0 mb-4 rounded-md border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-						{error}
-					</div>
-				)}
-
-				{/* Ingredient list – fills remaining height, scrolls */}
-				<div
-					className={
-						selectedIngredient
-							? "flex min-h-0 flex-1 flex-col pb-52"
-							: "flex min-h-0 flex-1 flex-col"
-					}
-				>
-					<IngredientPicker
-						ingredients={ingredients}
-						onSelect={handleSelectIngredient}
-						onAddMissing={() => setShowAddMissing(true)}
-						groupByCategory={false}
-						placeholder="Search ingredients..."
-						fillHeight
-						showAddButton={false}
-					/>
-				</div>
-
-				{/* Sticky footer – always visible at bottom */}
-				<div className="shrink-0 border-t border-slate-200 bg-white py-3 pt-4">
-					{cartItems.length > 0 && (
-						<Button
-							type="button"
-							onClick={() => setShowCartSheet(true)}
-							size="lg"
-							className="mb-3 h-12 w-full text-base font-semibold"
-							aria-label={`View cart (${cartItems.length} items)`}
-						>
-							<ShoppingCart className="mr-2 h-5 w-5" />
-							View cart ({cartItems.length}{" "}
-							{cartItems.length === 1 ? "item" : "items"})
-						</Button>
-					)}
-					<Button
-						type="button"
-						variant="outline"
-						onClick={() => setShowAddMissing(true)}
-						className="h-12 w-full text-base font-semibold border-2"
-					>
-						<Plus className="mr-2 h-5 w-5" />
-						Add missing ingredient
-					</Button>
-				</div>
-			</div>
-
-			{/* Bottom bar: quantity + Add to cart (no overlay – just the bar) */}
-			{selectedIngredient && (
-				<div
-					className="fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white shadow-[0_-4px_20px_rgba(0,0,0,0.08)] rounded-t-2xl"
-					role="dialog"
-					aria-label="Add to cart"
-				>
-					<div className="mx-auto max-w-4xl px-4 pt-4 pb-6 sm:pb-8">
-						{/* Header: ingredient name + close */}
-						<div className="flex items-center justify-between gap-3 mb-4">
-							<h3 className="text-base font-semibold text-slate-900 truncate flex-1 min-w-0">
-								{selectedIngredient.name}
-							</h3>
-							<button
-								type="button"
-								onClick={handleCloseAddBar}
-								className="shrink-0 p-2 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 focus:outline-none focus:ring-2 focus:ring-slate-300"
-								aria-label="Close"
-							>
-								<X className="h-5 w-5" />
-							</button>
-						</div>
-
-						{/* Quantity: stepper + input + quick add */}
-						<div className="space-y-3">
-							<div className="flex items-center gap-2">
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={() =>
-										setQuantity((q) => Math.max(1, q - 1))
-									}
-									disabled={quantity <= 1}
-									className="h-10 w-10 rounded-lg shrink-0"
-									aria-label="Decrease by 1"
-								>
-									−
-								</Button>
-								<div className="flex items-center gap-1.5 flex-1 min-w-0 max-w-[140px]">
-									<Input
-										type="number"
-										min={1}
-										value={quantity}
-										onChange={(e) => {
-											const v = parseInt(
-												e.target.value,
-												10,
-											);
-											if (!Number.isNaN(v) && v >= 1)
-												setQuantity(v);
-											else if (e.target.value === "")
-												setQuantity(1);
-										}}
-										onBlur={() =>
-											setQuantity((q) => (q < 1 ? 1 : q))
-										}
-										className="h-10 w-16 text-center text-base font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-										aria-label="Quantity"
-									/>
-									<span className="text-sm font-medium text-slate-600 shrink-0">
-										{unit}
-									</span>
-								</div>
-								<Button
-									variant="outline"
-									size="icon"
-									onClick={() => setQuantity((q) => q + 1)}
-									className="h-10 w-10 rounded-lg shrink-0"
-									aria-label="Increase by 1"
-								>
-									+
-								</Button>
-							</div>
-							<div className="flex flex-wrap items-center gap-2">
-								<span className="text-xs font-medium text-slate-500 w-full sm:w-auto">
-									Quick add:
-								</span>
-								{[1, 2, 5, 10, 20].map((n) => (
-									<Button
-										key={n}
-										variant="outline"
-										size="sm"
-										onClick={() =>
-											setQuantity((q) => q + n)
-										}
-										className="h-8 min-w-9 rounded-md text-sm font-medium"
-									>
-										+{n}
-									</Button>
-								))}
-								<Button
-									variant="ghost"
-									size="sm"
-									onClick={() => setQuantity(1)}
-									className="h-8 rounded-md text-sm font-medium text-slate-600 hover:text-slate-900"
-								>
-									Reset
-								</Button>
-							</div>
-						</div>
-
-						{/* Add to cart – optimistic; API runs in background */}
-						<Button
-							onClick={handleAddToCart}
-							size="lg"
-							className="mt-4 h-12 w-full text-base font-semibold rounded-xl"
-							aria-label="Add to cart"
-						>
-							Add to Cart
-						</Button>
-					</div>
-				</div>
-			)}
-
-			{/* View cart sheet – full cart list + submit */}
-			<Sheet open={showCartSheet} onOpenChange={setShowCartSheet}>
-				<SheetContent
-					side="bottom"
-					className="h-[85vh] overflow-hidden flex flex-col rounded-t-2xl"
-				>
-					<SheetHeader>
-						<SheetTitle className="text-left">Your cart</SheetTitle>
-					</SheetHeader>
-					<div className="flex-1 overflow-y-auto mt-4 -mx-6 px-6">
-						<CartItemsList
-							items={cartItems}
-							onUpdateQuantity={handleUpdateQuantity}
-							onRemoveItem={handleRemoveItem}
-						/>
-					</div>
-					<div className="pt-4 pb-8 border-t bg-white shrink-0 px-4">
-						{cartItems.some((i) => i._id.startsWith("temp-")) && (
-							<p className="text-sm text-slate-500 mb-2">
-								Saving items… You can submit when all items are saved.
-							</p>
-						)}
-						<Button
-							onClick={async () => {
-								await handleSubmitCart();
-								setShowCartSheet(false);
-							}}
-							disabled={
-								isSubmitting ||
-								!cartId ||
-								cartItems.some((i) => i._id.startsWith("temp-"))
-							}
-							size="lg"
-							className="h-14 w-full text-base font-semibold"
-							aria-label={
-								isSubmitting
-									? "Submitting cart"
-									: "Submit cart for review"
-							}
-						>
-							{isSubmitting
-								? "Submitting..."
-								: "Submit Cart for Review"}
-						</Button>
-					</div>
-				</SheetContent>
-			</Sheet>
-
-			{/* Add missing ingredient – single form with title + X */}
-			<Sheet open={showAddMissing} onOpenChange={setShowAddMissing}>
-				<SheetContent
-					side="bottom"
-					className="h-[90vh] overflow-y-auto"
-					showCloseButton={false}
-				>
-					<div className="px-1 pt-2">
-						<AddMissingIngredientForm
-							onSubmit={handleAddMissingIngredient}
-							onCancel={() => setShowAddMissing(false)}
-						/>
-					</div>
-				</SheetContent>
-			</Sheet>
-		</main>
+		<DraftCartBuilder
+			title={title}
+			subtitle="Search and add ingredients for this cart"
+			weekPlan={weekPlan}
+			userId={userId}
+			error={error}
+			ingredients={ingredients}
+			cartItems={cartItems}
+			selectedIngredient={selectedIngredient}
+			quantity={quantity}
+			unit={unit}
+			isSubmitting={isSubmitting}
+			showCartSheet={showCartSheet}
+			showAddMissing={showAddMissing}
+			submitButtonLabel="Submit Cart for Review"
+			submitDisabled={
+				isSubmitting ||
+				!cartId ||
+				cartItems.some((i) => i._id.startsWith("temp-"))
+			}
+			showSavingHint={cartItems.some((i) => i._id.startsWith("temp-"))}
+			onSelectIngredient={handleSelectIngredient}
+			onOpenCart={() => setShowCartSheet(true)}
+			onOpenAddMissing={() => setShowAddMissing(true)}
+			onCloseAddBar={handleCloseAddBar}
+			onSetShowCartSheet={setShowCartSheet}
+			onSetShowAddMissing={setShowAddMissing}
+			onDecreaseQuantity={() => setQuantity((q) => Math.max(1, q - 1))}
+			onIncreaseQuantity={() => setQuantity((q) => q + 1)}
+			onQuantityInputChange={(value) => {
+				const v = parseInt(value, 10);
+				if (!Number.isNaN(v) && v >= 1) setQuantity(v);
+				else if (value === "") setQuantity(1);
+			}}
+			onQuantityBlur={() => setQuantity((q) => (q < 1 ? 1 : q))}
+			onQuickAdd={(n) => setQuantity((q) => q + n)}
+			onResetQuantity={() => setQuantity(1)}
+			onAddToCart={handleAddToCart}
+			onUpdateQuantity={handleUpdateQuantity}
+			onRemoveItem={handleRemoveItem}
+			onSubmitCart={handleSubmitCart}
+			onAddMissingIngredient={handleAddMissingIngredient}
+		/>
 	);
 }

@@ -16,6 +16,7 @@ export type WeekPlanRecord = {
   weekStartDate: Date; // ISO date (Monday, or single-day plan date)
   createdByAdminId: ObjectId;
   assignedCookId: ObjectId; // default cook for days without per-day override
+  name?: string;
   days: WeekPlanDay[];
   notes?: string;
   createdAt: Date;

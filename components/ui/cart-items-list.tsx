@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo, useState } from "react";
 import { Loader2, Minus, Plus, Trash2 } from "lucide-react";
 import { Button } from "./button";
 import { Card, CardContent } from "./card";
@@ -29,6 +30,10 @@ export function CartItemsList({
   isLoading = false,
   readonly = false,
 }: CartItemsListProps) {
+  const [quantityDrafts, setQuantityDrafts] = useState<Record<string, string>>(
+    {}
+  );
+
   const groupedItems = items.reduce((acc, item) => {
     const category = item.categorySnapshot;
     if (!acc[category]) acc[category] = [];
@@ -36,6 +41,10 @@ export function CartItemsList({
     return acc;
   }, {} as Record<string, CartItem[]>);
   const categories = Object.keys(groupedItems).sort();
+  const itemMap = useMemo(
+    () => new Map(items.map((item) => [item._id, item])),
+    [items]
+  );
 
   if (items.length === 0) {
     return (
@@ -56,6 +65,39 @@ export function CartItemsList({
       .slice(0, categories.indexOf(category))
       .reduce((sum, c) => sum + groupedItems[c].length, 0) + indexInCategory + 1;
 
+  const getCurrentQuantity = (item: CartItem) => {
+    const draft = quantityDrafts[item._id];
+    const parsed = Number.parseInt(draft ?? "", 10);
+    return Number.isNaN(parsed) || parsed < 1 ? item.quantityRequested : parsed;
+  };
+
+  const setDraftForItem = (itemId: string, value: string) => {
+    setQuantityDrafts((prev) => ({ ...prev, [itemId]: value }));
+  };
+
+  const clearDraftForItem = (itemId: string) => {
+    setQuantityDrafts((prev) => {
+      const next = { ...prev };
+      delete next[itemId];
+      return next;
+    });
+  };
+
+  const commitDraftQuantity = (itemId: string) => {
+    const item = itemMap.get(itemId);
+    if (!item) return;
+    const raw = quantityDrafts[itemId];
+    if (raw === undefined) return;
+
+    const parsed = Number.parseInt(raw, 10);
+    const normalized = Number.isNaN(parsed) || parsed < 1 ? 1 : parsed;
+    clearDraftForItem(itemId);
+
+    if (normalized !== item.quantityRequested) {
+      onUpdateQuantity(itemId, normalized);
+    }
+  };
+
   return (
     <div className="px-4">
       {categories.map((category) => (
@@ -75,10 +117,9 @@ export function CartItemsList({
                     <span className="w-7 shrink-0 text-base font-medium text-slate-500 tabular-nums">
                       {getItemNumber(category, indexInCategory)}.
                     </span>
-                    <span className="flex-1 min-w-0 text-base font-medium text-slate-900 truncate">
+                    <span className="flex-1 min-w-0 text-sm font-medium leading-5 text-slate-900 whitespace-normal break-words">
                       {item.nameSnapshot}
                     </span>
-                    <span className="text-slate-500">|</span>
                     <div className="flex items-center shrink-0">
                       {isPending ? (
                         <span className="flex items-center gap-1.5 text-sm text-slate-500">
@@ -96,22 +137,46 @@ export function CartItemsList({
                             onClick={() =>
                               onUpdateQuantity(
                                 item._id,
-                                Math.max(1, item.quantityRequested - 1)
+                                Math.max(1, getCurrentQuantity(item) - 1)
                               )
                             }
-                            disabled={isLoading || item.quantityRequested <= 1}
+                            disabled={isLoading || getCurrentQuantity(item) <= 1}
                             className="flex h-7 w-7 items-center justify-center rounded-l-md text-slate-600 hover:bg-slate-200/80 hover:text-slate-900 disabled:opacity-40 disabled:hover:bg-transparent"
                             aria-label={`Decrease ${item.nameSnapshot}`}
                           >
                             <Minus className="h-3.5 w-3.5" />
                           </button>
-                          <span className="min-w-9 px-1 py-0.5 text-center text-sm font-semibold text-slate-900 tabular-nums">
-                            {item.quantityRequested} {item.unit}
-                          </span>
+                          <div className="flex items-center gap-1 px-1">
+                            <input
+                              type="number"
+                              min={1}
+                              inputMode="numeric"
+                              value={quantityDrafts[item._id] ?? `${item.quantityRequested}`}
+                              onChange={(e) => setDraftForItem(item._id, e.target.value)}
+                              onBlur={() => commitDraftQuantity(item._id)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  (e.currentTarget as HTMLInputElement).blur();
+                                }
+                              }}
+                              style={{
+                                width: `${Math.max(
+                                  1,
+                                  (quantityDrafts[item._id] ?? `${item.quantityRequested}`).length
+                                )}ch`,
+                              }}
+                              className="h-6 min-w-2 border-0 bg-transparent p-0 text-center text-sm font-semibold text-slate-900 tabular-nums outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              aria-label={`Quantity for ${item.nameSnapshot}`}
+                              disabled={isLoading}
+                            />
+                            <span className="text-xs font-semibold text-slate-600">
+                              {item.unit}
+                            </span>
+                          </div>
                           <button
                             type="button"
                             onClick={() =>
-                              onUpdateQuantity(item._id, item.quantityRequested + 1)
+                              onUpdateQuantity(item._id, getCurrentQuantity(item) + 1)
                             }
                             disabled={isLoading}
                             className="flex h-7 w-7 items-center justify-center rounded-r-md text-slate-600 hover:bg-slate-200/80 hover:text-slate-900"
@@ -138,9 +203,6 @@ export function CartItemsList({
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     )}
-                  </div>
-                  <div className="pl-9 text-xs text-slate-500">
-                    ({item.categorySnapshot})
                   </div>
                 </li>
               );

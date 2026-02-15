@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -79,8 +79,10 @@ export function IngredientPicker({
   fillHeight = false,
   showAddButton = true,
 }: IngredientPickerProps) {
+  const ITEMS_PER_PAGE = 10;
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedTab, setSelectedTab] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
 
   // Group ingredients by category
   const groupedIngredients = useMemo(() => {
@@ -158,6 +160,33 @@ export function IngredientPicker({
 
     return grouped;
   }, [filteredIngredients, displayedIngredients, groupByCategory]);
+
+  const totalItems = displayedIngredients.length;
+  const totalPages = Math.max(1, Math.ceil(totalItems / ITEMS_PER_PAGE));
+  const safePage = Math.min(currentPage, totalPages);
+
+  const paginatedIngredients = useMemo(() => {
+    const start = (safePage - 1) * ITEMS_PER_PAGE;
+    return displayedIngredients.slice(start, start + ITEMS_PER_PAGE);
+  }, [displayedIngredients, safePage, ITEMS_PER_PAGE]);
+
+  const paginatedDisplayGrouped = useMemo(() => {
+    if (filteredIngredients || !groupByCategory) {
+      return null;
+    }
+
+    const grouped: Record<string, IngredientRecord[]> = {};
+    paginatedIngredients.forEach((ing) => {
+      const cat = ing.category || "Uncategorized";
+      if (!grouped[cat]) grouped[cat] = [];
+      grouped[cat].push(ing);
+    });
+    return grouped;
+  }, [filteredIngredients, groupByCategory, paginatedIngredients]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, currentTab, ingredients.length]);
 
   const handleClearSearch = useCallback(() => {
     setSearchQuery("");
@@ -245,7 +274,7 @@ export function IngredientPicker({
             <div className={listClassName}>
               {displayGrouped ? (
                 // Grouped view
-                Object.entries(displayGrouped).map(([category, items]) => (
+                Object.entries(paginatedDisplayGrouped ?? {}).map(([category, items]) => (
                   <div key={category}>
                     <h3 className="text-sm font-semibold text-gray-700 mb-2 mt-3 first:mt-0">
                       {category}
@@ -265,7 +294,7 @@ export function IngredientPicker({
               ) : (
                 // Flat list
                 <div className="space-y-2">
-                  {displayedIngredients.map((ingredient) => (
+                  {paginatedIngredients.map((ingredient) => (
                     <IngredientButton
                       key={ingredient._id?.toString()}
                       ingredient={ingredient}
@@ -290,7 +319,7 @@ export function IngredientPicker({
                 : "No ingredients available"}
             </div>
           ) : (
-            displayedIngredients.map((ingredient) => (
+            paginatedIngredients.map((ingredient) => (
               <IngredientButton
                 key={ingredient._id?.toString()}
                 ingredient={ingredient}
@@ -299,6 +328,35 @@ export function IngredientPicker({
               />
             ))
           )}
+        </div>
+      )}
+
+      {/* Pagination */}
+      {totalItems > ITEMS_PER_PAGE && (
+        <div className="flex items-center justify-between gap-2 text-sm text-gray-600">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+            disabled={safePage <= 1}
+          >
+            Previous
+          </Button>
+          <span>
+            Page {safePage} of {totalPages}
+          </span>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+            disabled={safePage >= totalPages}
+          >
+            Next
+          </Button>
         </div>
       )}
 

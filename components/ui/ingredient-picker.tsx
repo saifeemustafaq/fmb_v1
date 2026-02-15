@@ -55,6 +55,11 @@ export interface IngredientPickerProps {
    * When false, the "Add missing ingredient" button is not rendered (e.g. when parent renders it in a sticky footer).
    */
   showAddButton?: boolean;
+
+  /**
+   * Current cart quantity by ingredientId. If missing, treated as 0.
+   */
+  cartQuantityByIngredientId?: Record<string, number>;
 }
 
 /**
@@ -78,6 +83,7 @@ export function IngredientPicker({
   groupByCategory = true,
   fillHeight = false,
   showAddButton = true,
+  cartQuantityByIngredientId = {},
 }: IngredientPickerProps) {
   const ITEMS_PER_PAGE = 10;
   const [searchQuery, setSearchQuery] = useState("");
@@ -286,6 +292,9 @@ export function IngredientPicker({
                           ingredient={ingredient}
                           onSelect={onSelect}
                           disabled={disabled}
+                          currentCount={
+                            cartQuantityByIngredientId[ingredient._id?.toString() ?? ""] ?? 0
+                          }
                         />
                       ))}
                     </div>
@@ -300,6 +309,9 @@ export function IngredientPicker({
                       ingredient={ingredient}
                       onSelect={onSelect}
                       disabled={disabled}
+                      currentCount={
+                        cartQuantityByIngredientId[ingredient._id?.toString() ?? ""] ?? 0
+                      }
                     />
                   ))}
                 </div>
@@ -325,6 +337,9 @@ export function IngredientPicker({
                 ingredient={ingredient}
                 onSelect={onSelect}
                 disabled={disabled}
+                currentCount={
+                  cartQuantityByIngredientId[ingredient._id?.toString() ?? ""] ?? 0
+                }
               />
             ))
           )}
@@ -384,10 +399,12 @@ function IngredientButton({
   ingredient,
   onSelect,
   disabled,
+  currentCount,
 }: {
   ingredient: IngredientRecord;
   onSelect: (ingredient: IngredientRecord) => void;
   disabled: boolean;
+  currentCount: number;
 }) {
   const isPending = ingredient.visibility === "private" && ingredient.status === "pending";
 
@@ -417,6 +434,9 @@ function IngredientButton({
                 <span>{ingredient.category}</span>
               </>
             )}
+          </div>
+          <div className="mt-1 text-xs text-slate-600">
+            In cart: <span className="font-semibold tabular-nums">{currentCount}</span>
           </div>
         </div>
       </div>

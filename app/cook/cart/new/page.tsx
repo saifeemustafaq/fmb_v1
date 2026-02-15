@@ -30,10 +30,15 @@ export default function NewCartPage() {
 
 	const cartIdRef = useRef<string | null>(null);
 	const createCartPromiseRef = useRef<Promise<string> | null>(null);
+	const cartItemsRef = useRef<CartItem[]>([]);
 
 	useEffect(() => {
 		cartIdRef.current = cartId;
 	}, [cartId]);
+
+	useEffect(() => {
+		cartItemsRef.current = cartItems;
+	}, [cartItems]);
 
 	// Fetch user's ingredients and week plan
 	useEffect(() => {
@@ -88,9 +93,20 @@ export default function NewCartPage() {
 	}, [router]);
 
 	const handleSelectIngredient = (ingredient: IngredientRecord) => {
+		const ingredientId = ingredient._id?.toString();
+		const existingTotal =
+			ingredientId == null
+				? 0
+				: cartItems.reduce(
+						(sum, item) =>
+							item.ingredientId === ingredientId
+								? sum + item.quantityRequested
+								: sum,
+						0,
+				  );
 		setSelectedIngredient(ingredient);
 		setUnit(ingredient.defaultUnit);
-		setQuantity(1);
+		setQuantity(existingTotal);
 	};
 
 	const getOrCreateCartId = async (): Promise<string> => {
@@ -115,21 +131,102 @@ export default function NewCartPage() {
 	const handleAddToCart = () => {
 		if (!selectedIngredient || !weekPlanId) return;
 
+		const ingredientId = selectedIngredient._id!.toString();
+		const ingredientName = selectedIngredient.name;
+		const ingredientCategory = selectedIngredient.category;
+		const ingredientStoreId = selectedIngredient.storeId?.toString() || null;
+		const quantityToSet = quantity;
+		const unitToAdd = unit;
+		const existingItem = cartItems.find(
+			(item) => item.ingredientId === ingredientId && item.unit === unitToAdd,
+		);
+
+		if (existingItem) {
+			const previousQuantity = existingItem.quantityRequested;
+			setCartItems((prev) =>
+				prev.map((item) =>
+					item._id === existingItem._id
+						? { ...item, quantityRequested: quantityToSet }
+						: item,
+				),
+			);
+			setSelectedIngredient(null);
+			setQuantity(0);
+			setUnit("");
+
+			if (quantityToSet <= 0) {
+				setCartItems((prev) =>
+					prev.filter((item) => item._id !== existingItem._id),
+				);
+			}
+
+			if (!existingItem._id.startsWith("temp-") && cartIdRef.current) {
+				(async () => {
+					try {
+						const res =
+							quantityToSet <= 0
+								? await fetch(
+										`/api/carts/${cartIdRef.current}/items/${existingItem._id}`,
+										{ method: "DELETE" },
+								  )
+								: await fetch(
+										`/api/carts/${cartIdRef.current}/items/${existingItem._id}`,
+										{
+											method: "PATCH",
+											headers: { "Content-Type": "application/json" },
+											body: JSON.stringify({ quantity: quantityToSet }),
+										},
+								  );
+						if (!res.ok)
+							throw new Error(
+								quantityToSet <= 0
+									? "Failed to remove item"
+									: "Failed to update quantity",
+							);
+					} catch (err) {
+						console.error(err);
+						setError(
+							quantityToSet <= 0
+								? "Failed to remove item"
+								: "Failed to update quantity",
+						);
+						setCartItems((prev) => {
+							if (quantityToSet <= 0) {
+								return [...prev, existingItem];
+							}
+							return prev.map((item) =>
+								item._id === existingItem._id
+									? { ...item, quantityRequested: previousQuantity }
+									: item,
+							);
+						});
+					}
+				})();
+			}
+			return;
+		}
+
+		if (quantityToSet <= 0) {
+			setSelectedIngredient(null);
+			setUnit("");
+			return;
+		}
+
 		const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
 		const payload = {
 			_id: tempId,
-			ingredientId: selectedIngredient._id!.toString(),
-			nameSnapshot: selectedIngredient.name,
-			categorySnapshot: selectedIngredient.category,
-			storeIdSnapshot: selectedIngredient.storeId?.toString() || null,
-			quantityRequested: quantity,
-			unit,
+			ingredientId,
+			nameSnapshot: ingredientName,
+			categorySnapshot: ingredientCategory,
+			storeIdSnapshot: ingredientStoreId,
+			quantityRequested: quantityToSet,
+			unit: unitToAdd,
 		};
 
 		// Optimistic: add to UI and close add bar immediately
 		setCartItems((prev) => [...prev, payload]);
 		setSelectedIngredient(null);
-		setQuantity(1);
+		setQuantity(0);
 		setUnit("");
 
 		// Background: create cart (if needed) + add item, then replace temp id with real id
@@ -142,9 +239,9 @@ export default function NewCartPage() {
 						method: "POST",
 						headers: { "Content-Type": "application/json" },
 						body: JSON.stringify({
-							ingredientId: selectedIngredient._id,
-							quantity,
-							unit,
+							ingredientId,
+							quantity: quantityToSet,
+							unit: unitToAdd,
 						}),
 					},
 				);
@@ -155,6 +252,30 @@ export default function NewCartPage() {
 						item._id === tempId ? { ...item, _id: itemId } : item,
 					),
 				);
+
+				const latestItem = cartItemsRef.current.find(
+					(item) => item._id === tempId,
+				);
+				if (!latestItem) {
+					const deleteRes = await fetch(
+						`/api/carts/${currentCartId}/items/${itemId}`,
+						{ method: "DELETE" },
+					);
+					if (!deleteRes.ok) throw new Error("Failed to remove item");
+					return;
+				}
+				const latestQuantity = latestItem.quantityRequested;
+				if (latestQuantity !== quantityToSet) {
+					const updateRes = await fetch(
+						`/api/carts/${currentCartId}/items/${itemId}`,
+						{
+							method: "PATCH",
+							headers: { "Content-Type": "application/json" },
+							body: JSON.stringify({ quantity: latestQuantity }),
+						},
+					);
+					if (!updateRes.ok) throw new Error("Failed to update quantity");
+				}
 			} catch (err) {
 				console.error(err);
 				setError(err instanceof Error ? err.message : "Failed to add item");
@@ -335,16 +456,16 @@ export default function NewCartPage() {
 			onCloseAddBar={handleCloseAddBar}
 			onSetShowCartSheet={setShowCartSheet}
 			onSetShowAddMissing={setShowAddMissing}
-			onDecreaseQuantity={() => setQuantity((q) => Math.max(1, q - 1))}
+			onDecreaseQuantity={() => setQuantity((q) => Math.max(0, q - 1))}
 			onIncreaseQuantity={() => setQuantity((q) => q + 1)}
 			onQuantityInputChange={(value) => {
 				const v = parseInt(value, 10);
-				if (!Number.isNaN(v) && v >= 1) setQuantity(v);
-				else if (value === "") setQuantity(1);
+				if (!Number.isNaN(v) && v >= 0) setQuantity(v);
+				else if (value === "") setQuantity(0);
 			}}
-			onQuantityBlur={() => setQuantity((q) => (q < 1 ? 1 : q))}
+			onQuantityBlur={() => setQuantity((q) => (q < 0 ? 0 : q))}
 			onQuickAdd={(n) => setQuantity((q) => q + n)}
-			onResetQuantity={() => setQuantity(1)}
+			onResetQuantity={() => setQuantity(0)}
 			onAddToCart={handleAddToCart}
 			onUpdateQuantity={handleUpdateQuantity}
 			onRemoveItem={handleRemoveItem}

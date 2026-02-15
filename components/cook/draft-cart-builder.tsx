@@ -102,6 +102,14 @@ export function DraftCartBuilder({
   onSubmitCart,
   onAddMissingIngredient,
 }: DraftCartBuilderProps) {
+  const cartQuantityByIngredientId = cartItems.reduce<Record<string, number>>(
+    (acc, item) => {
+      acc[item.ingredientId] = (acc[item.ingredientId] ?? 0) + item.quantityRequested;
+      return acc;
+    },
+    {}
+  );
+
   const myDays: WeekMenuDay[] =
     weekPlan && userId
       ? weekPlan.days
@@ -166,6 +174,7 @@ export function DraftCartBuilder({
             placeholder="Search ingredients..."
             fillHeight
             showAddButton={false}
+            cartQuantityByIngredientId={cartQuantityByIngredientId}
           />
         </div>
       </div>
@@ -221,25 +230,24 @@ export function DraftCartBuilder({
             </div>
 
             <div className="space-y-3">
-              <div className="flex items-center gap-2">
+              <div className="grid grid-cols-3 items-center gap-2">
                 <Button
                   variant="outline"
-                  size="icon"
                   onClick={onDecreaseQuantity}
-                  disabled={quantity <= 1}
-                  className="h-10 w-10 rounded-lg shrink-0"
+                  disabled={quantity <= 0}
+                  className="h-10 w-full rounded-lg border-slate-400 hover:border-slate-500"
                   aria-label="Decrease by 1"
                 >
                   −
                 </Button>
-                <div className="flex min-w-0 max-w-[140px] flex-1 items-center gap-1.5">
+                <div className="flex min-w-0 items-center justify-center gap-1.5">
                   <Input
                     type="number"
-                    min={1}
+                    min={0}
                     value={quantity}
                     onChange={(e) => onQuantityInputChange(e.target.value)}
                     onBlur={onQuantityBlur}
-                    className="h-10 w-16 text-center text-base font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    className="h-10 w-full text-center text-base font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                     aria-label="Quantity"
                   />
                   <span className="shrink-0 rounded-full border border-slate-300 bg-slate-50 px-2 py-0.5 text-xs font-semibold text-slate-700">
@@ -248,9 +256,8 @@ export function DraftCartBuilder({
                 </div>
                 <Button
                   variant="outline"
-                  size="icon"
                   onClick={onIncreaseQuantity}
-                  className="h-10 w-10 rounded-lg shrink-0"
+                  className="h-10 w-full rounded-lg border-slate-400 hover:border-slate-500"
                   aria-label="Increase by 1"
                 >
                   +

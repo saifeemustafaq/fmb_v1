@@ -117,13 +117,49 @@ export default function ContinueCartPage() {
   }, [cartIdParam, router]);
 
   const handleSelectIngredient = (ingredient: IngredientRecord) => {
+    const ingredientId = ingredient._id?.toString();
+    const existingTotal =
+      ingredientId == null
+        ? 0
+        : cartItems.reduce(
+            (sum, item) =>
+              item.ingredientId === ingredientId
+                ? sum + item.quantityRequested
+                : sum,
+            0
+          );
     setSelectedIngredient(ingredient);
     setUnit(ingredient.defaultUnit);
-    setQuantity(1);
+    setQuantity(existingTotal);
   };
 
   const handleAddToCart = async () => {
     if (!selectedIngredient || !cartIdParam) return;
+
+    const ingredientId = selectedIngredient._id!.toString();
+    const unitToAdd = unit;
+    const quantityToSet = quantity;
+    const existingItem = cartItems.find(
+      (item) => item.ingredientId === ingredientId && item.unit === unitToAdd
+    );
+
+    if (existingItem) {
+      if (quantityToSet <= 0) {
+        handleRemoveItem(existingItem._id);
+      } else {
+        handleUpdateQuantity(existingItem._id, quantityToSet);
+      }
+      setSelectedIngredient(null);
+      setQuantity(0);
+      setUnit("");
+      return;
+    }
+
+    if (quantityToSet <= 0) {
+      setSelectedIngredient(null);
+      setUnit("");
+      return;
+    }
 
     try {
       setIsSubmitting(true);
@@ -131,9 +167,9 @@ export default function ContinueCartPage() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          ingredientId: selectedIngredient._id,
-          quantity,
-          unit,
+          ingredientId,
+          quantity: quantityToSet,
+          unit: unitToAdd,
         }),
       });
 
@@ -144,17 +180,17 @@ export default function ContinueCartPage() {
         ...prev,
         {
           _id: itemId,
-          ingredientId: selectedIngredient._id!.toString(),
+          ingredientId,
           nameSnapshot: selectedIngredient.name,
           categorySnapshot: selectedIngredient.category,
           storeIdSnapshot: selectedIngredient.storeId?.toString() ?? null,
-          quantityRequested: quantity,
-          unit,
+          quantityRequested: quantityToSet,
+          unit: unitToAdd,
         },
       ]);
 
       setSelectedIngredient(null);
-      setQuantity(1);
+      setQuantity(0);
       setUnit("");
     } catch (err) {
       console.error(err);
@@ -404,16 +440,16 @@ export default function ContinueCartPage() {
       onCloseAddBar={handleCloseAddBar}
       onSetShowCartSheet={setShowCartSheet}
       onSetShowAddMissing={setShowAddMissing}
-      onDecreaseQuantity={() => setQuantity((q) => Math.max(1, q - 1))}
+      onDecreaseQuantity={() => setQuantity((q) => Math.max(0, q - 1))}
       onIncreaseQuantity={() => setQuantity((q) => q + 1)}
       onQuantityInputChange={(value) => {
         const v = parseInt(value, 10);
-        if (!Number.isNaN(v) && v >= 1) setQuantity(v);
-        else if (value === "") setQuantity(1);
+        if (!Number.isNaN(v) && v >= 0) setQuantity(v);
+        else if (value === "") setQuantity(0);
       }}
-      onQuantityBlur={() => setQuantity((q) => (q < 1 ? 1 : q))}
+      onQuantityBlur={() => setQuantity((q) => (q < 0 ? 0 : q))}
       onQuickAdd={(n) => setQuantity((q) => q + n)}
-      onResetQuantity={() => setQuantity(1)}
+      onResetQuantity={() => setQuantity(0)}
       onAddToCart={handleAddToCart}
       onUpdateQuantity={handleUpdateQuantity}
       onRemoveItem={handleRemoveItem}

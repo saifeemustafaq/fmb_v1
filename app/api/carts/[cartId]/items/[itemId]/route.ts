@@ -9,6 +9,7 @@ import {
   updateCartItemUnit,
   updateCartItemStoreAndCategory,
   removeItemFromCart,
+  getCartById,
 } from "@/lib/carts";
 
 const updateItemSchema = z.object({
@@ -33,6 +34,9 @@ export async function PATCH(
     const user = await verifySessionToken(token.value);
     const { cartId, itemId } = await params;
 
+    if (!ObjectId.isValid(cartId)) {
+      return NextResponse.json({ error: "Invalid cart ID" }, { status: 400 });
+    }
     if (!ObjectId.isValid(itemId)) {
       return NextResponse.json({ error: "Invalid item ID" }, { status: 400 });
     }
@@ -54,6 +58,25 @@ export async function PATCH(
 
     if ((hasStoreOrCategory || hasUnit) && user.role !== "admin") {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+
+    const cartResult = await getCartById(new ObjectId(cartId));
+    if (!cartResult) {
+      return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+    }
+    const { cart, items } = cartResult;
+    if (user.role !== "admin" && cart.cookId.toString() !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (cart.status === "finalized") {
+      return NextResponse.json(
+        { error: "Cannot modify finalized cart" },
+        { status: 400 }
+      );
+    }
+    const belongsToCart = items.some((item) => item._id?.toString() === itemId);
+    if (!belongsToCart) {
+      return NextResponse.json({ error: "Item not found in cart" }, { status: 404 });
     }
 
     const itemObjectId = new ObjectId(itemId);
@@ -119,11 +142,33 @@ export async function DELETE(
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
-    await verifySessionToken(token.value);
-    const { itemId } = await params;
+    const user = await verifySessionToken(token.value);
+    const { cartId, itemId } = await params;
 
+    if (!ObjectId.isValid(cartId)) {
+      return NextResponse.json({ error: "Invalid cart ID" }, { status: 400 });
+    }
     if (!ObjectId.isValid(itemId)) {
       return NextResponse.json({ error: "Invalid item ID" }, { status: 400 });
+    }
+
+    const cartResult = await getCartById(new ObjectId(cartId));
+    if (!cartResult) {
+      return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+    }
+    const { cart, items } = cartResult;
+    if (user.role !== "admin" && cart.cookId.toString() !== user.id) {
+      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+    }
+    if (cart.status === "finalized") {
+      return NextResponse.json(
+        { error: "Cannot modify finalized cart" },
+        { status: 400 }
+      );
+    }
+    const belongsToCart = items.some((item) => item._id?.toString() === itemId);
+    if (!belongsToCart) {
+      return NextResponse.json({ error: "Item not found in cart" }, { status: 404 });
     }
 
     const itemObjectId = new ObjectId(itemId);

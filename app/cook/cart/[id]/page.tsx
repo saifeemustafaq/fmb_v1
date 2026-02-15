@@ -17,7 +17,11 @@ import type { IngredientRecord } from "@/lib/interfaces/ingredient";
 
 type CartStatus = "draft" | "submitted" | "finalized";
 
-export default function ContinueCartPage() {
+export function ContinueCartPageContent({
+  allowSubmittedEdit = false,
+}: {
+  allowSubmittedEdit?: boolean;
+}) {
   const router = useRouter();
   const params = useParams();
   const cartIdParam = params?.id as string | undefined;
@@ -38,6 +42,7 @@ export default function ContinueCartPage() {
   const [error, setError] = useState<string | null>(null);
 
   const isDraft = cartStatus === "draft";
+  const isEditableStatus = isDraft || (allowSubmittedEdit && cartStatus === "submitted");
 
   // Load cart by ID and week plan
   useEffect(() => {
@@ -329,8 +334,8 @@ export default function ContinueCartPage() {
     );
   }
 
-  // Read-only view for submitted/finalized carts
-  if (!isDraft) {
+  // Read-only view for submitted/finalized carts unless explicitly in edit mode for submitted
+  if (!isEditableStatus) {
     return (
       <main className="flex min-h-screen flex-col bg-white text-slate-900">
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col min-h-0 px-4 py-4 sm:py-6">
@@ -406,7 +411,7 @@ export default function ContinueCartPage() {
     );
   }
 
-  // Draft: full continue-building UI (same as new cart)
+  // Editable view: draft continue or submitted edit mode
   const title = weekPlan
     ? weekPlan.name?.trim()
       ? `Cart — ${weekPlan.name}`
@@ -420,7 +425,11 @@ export default function ContinueCartPage() {
   return (
     <DraftCartBuilder
       title={title}
-      subtitle="Pick up where you left off"
+      subtitle={
+        isDraft
+          ? "Pick up where you left off"
+          : "Update your submitted cart before admin finalizes it"
+      }
       weekPlan={weekPlan}
       userId={userId}
       error={error}
@@ -432,8 +441,9 @@ export default function ContinueCartPage() {
       isSubmitting={isSubmitting}
       showCartSheet={showCartSheet}
       showAddMissing={showAddMissing}
-      submitButtonLabel="Submit Cart for Review"
-      submitDisabled={isSubmitting}
+      submitButtonLabel={isDraft ? "Submit Cart for Review" : "Done Editing"}
+      submitDisabled={isSubmitting || cartItems.some((i) => i._id.startsWith("temp-"))}
+      showSavingHint={cartItems.some((i) => i._id.startsWith("temp-"))}
       onSelectIngredient={handleSelectIngredient}
       onOpenCart={() => setShowCartSheet(true)}
       onOpenAddMissing={() => setShowAddMissing(true)}
@@ -453,8 +463,18 @@ export default function ContinueCartPage() {
       onAddToCart={handleAddToCart}
       onUpdateQuantity={handleUpdateQuantity}
       onRemoveItem={handleRemoveItem}
-      onSubmitCart={handleSubmitCart}
+      onSubmitCart={
+        isDraft
+          ? handleSubmitCart
+          : async () => {
+              router.push(`/cook/cart/${cartIdParam}`);
+            }
+      }
       onAddMissingIngredient={handleAddMissingIngredient}
     />
   );
+}
+
+export default function ContinueCartPage() {
+  return <ContinueCartPageContent />;
 }

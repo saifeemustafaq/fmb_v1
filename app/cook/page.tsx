@@ -222,15 +222,17 @@ function CookDashboardContent() {
         </section>
 
         <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div>
+          <div>
+            <div className="flex items-center justify-between gap-3">
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Current assignment</p>
+              <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
+                {statusPill}
+              </span>
+            </div>
+            <div className="mt-2">
               <h2 className="mt-1 text-2xl font-bold text-slate-900">{topHeading}</h2>
               <p className="mt-1 text-base text-slate-600">{topDescription}</p>
             </div>
-            <span className="rounded-full border border-slate-300 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-700">
-              {statusPill}
-            </span>
           </div>
 
           {weekPlan && hasAssignedDays && (
@@ -270,17 +272,35 @@ function CookDashboardContent() {
               </Link>
             </Button>
           )}
-          {(dashboardState === "assignedSubmittedCart" || dashboardState === "assignedFinalizedCart") &&
-            cart && (
+          {dashboardState === "assignedSubmittedCart" && cart && (
+            <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button
                 asChild
                 variant="outline"
                 size="lg"
-                className="mt-4 min-h-[48px] h-12 w-full text-base font-medium focus-visible:ring-2 focus-visible:ring-offset-2"
+                className="min-h-[48px] h-12 w-full text-base font-medium focus-visible:ring-2 focus-visible:ring-offset-2"
               >
                 <Link href={`/cook/cart/${cart._id}`}>View current cart</Link>
               </Button>
-            )}
+              <Button
+                asChild
+                size="lg"
+                className="min-h-[48px] h-12 w-full text-base font-semibold focus-visible:ring-2 focus-visible:ring-offset-2"
+              >
+                <Link href={`/cook/cart/${cart._id}/edit`}>Edit current cart</Link>
+              </Button>
+            </div>
+          )}
+          {dashboardState === "assignedFinalizedCart" && cart && (
+            <Button
+              asChild
+              variant="outline"
+              size="lg"
+              className="mt-4 min-h-[48px] h-12 w-full text-base font-medium focus-visible:ring-2 focus-visible:ring-offset-2"
+            >
+              <Link href={`/cook/cart/${cart._id}`}>View current cart</Link>
+            </Button>
+          )}
 
           {weekPlan && !hasAssignedDays && (
             <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-base text-amber-800">

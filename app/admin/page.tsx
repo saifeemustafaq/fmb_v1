@@ -2,8 +2,17 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { getAllCartsForAdmin } from "@/lib/carts";
 
-export default function AdminDashboard() {
+export default async function AdminDashboard() {
+  let cartsPendingFinalization = 0;
+  try {
+    const carts = await getAllCartsForAdmin();
+    cartsPendingFinalization = carts.filter((cart) => cart.status === "submitted").length;
+  } catch (error) {
+    console.error("Failed to load pending carts count:", error);
+  }
+
   return (
     <main className="min-h-screen bg-slate-50 px-4 py-6 text-slate-900">
       <div className="mx-auto w-full max-w-4xl">
@@ -50,7 +59,7 @@ export default function AdminDashboard() {
               <CardTitle className="text-xl">
                 Cart Review
                 <Badge className="ml-3 text-sm" variant="default">
-                  3 Pending
+                  {cartsPendingFinalization} Pending
                 </Badge>
               </CardTitle>
               <CardDescription className="text-base">

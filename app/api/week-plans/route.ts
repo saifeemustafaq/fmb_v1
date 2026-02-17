@@ -4,7 +4,13 @@ import { ObjectId } from "mongodb";
 import { z } from "zod";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { createWeekPlan, listAllWeekPlans, serializeWeekPlanForResponse } from "@/lib/week-plans";
+import {
+  countPlansForWeek,
+  createWeekPlan,
+  listAllWeekPlans,
+  normalizeToMonday,
+  serializeWeekPlanForResponse,
+} from "@/lib/week-plans";
 import type { DayType } from "@/lib/interfaces/cart";
 
 const dayTypeEnum = z.enum([
@@ -29,7 +35,14 @@ const createWeekPlanSchema = z.object({
   assignedCookId: z.string().refine((id) => ObjectId.isValid(id), {
     message: "Invalid assignedCookId",
   }),
-  days: z.array(daySchema).min(1).max(7),
+  name: z.string().optional(),
+  days: z
+    .array(daySchema)
+    .min(1)
+    .max(7)
+    .refine((days) => days.length === 1 || days.length === 7, {
+      message: "Plan must be either single-day (1 day) or full-week (7 days)",
+    }),
   notes: z.string().optional(),
 });
 
@@ -81,12 +94,30 @@ export async function POST(request: Request) {
       );
     }
 
-    const { weekStartDate, assignedCookId, days, notes } = parsed.data;
+    const { weekStartDate, assignedCookId, days, notes, name } = parsed.data;
+    const isSingleDay = days.length === 1;
+    const anchorDate = isSingleDay ? new Date(days[0].date) : new Date(weekStartDate);
+    const normalizedMonday = normalizeToMonday(anchorDate);
+    const { fullWeekCount, singleDayCount } = await countPlansForWeek(normalizedMonday);
+
+    if (!isSingleDay && fullWeekCount >= 1) {
+      return NextResponse.json(
+        { error: "A full-week plan already exists for this week." },
+        { status: 409 }
+      );
+    }
+    if (isSingleDay && singleDayCount >= 6) {
+      return NextResponse.json(
+        { error: "Only 6 single-day plans are allowed per week." },
+        { status: 409 }
+      );
+    }
 
     const weekPlanData = {
-      weekStartDate: new Date(weekStartDate),
+      weekStartDate: normalizedMonday,
       createdByAdminId: new ObjectId(user.id),
       assignedCookId: new ObjectId(assignedCookId),
+      name: name?.trim() ? name.trim() : undefined,
       days: days.map((d) => ({
         date: new Date(d.date),
         dayType: d.dayType as DayType,

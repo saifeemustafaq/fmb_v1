@@ -64,10 +64,10 @@ export async function POST(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Check cart is in draft status
-    if (cart.status !== "draft") {
+    // Finalized carts are locked for edits
+    if (cart.status === "finalized") {
       return NextResponse.json(
-        { error: "Cannot modify submitted cart" },
+        { error: "Cannot modify finalized cart" },
         { status: 400 }
       );
     }

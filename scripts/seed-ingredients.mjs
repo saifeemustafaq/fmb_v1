@@ -30,27 +30,58 @@ if (!MONGODB_URI) {
 }
 
 /**
- * Maps product units to standardized units
+ * Maps product units to standardized unit shortNames.
+ * Canonical list is in lib/constants/units.ts (ALLOWED_UNIT_VALUES).
+ * Output must be one of: lbs, pkt, bunch, case, gal, oz, g, btl, can, pc, box, ct, kg.
  */
 function normalizeUnit(unit) {
-  if (unit === "Not Assigned" || !unit) return "pcs";
-  
+  if (unit === "Not Assigned" || !unit) return "pc";
+
   const unitMap = {
-    kg: "kg",
-    g: "g",
-    ml: "ml",
-    l: "l",
-    pcs: "pcs",
-    piece: "pcs",
-    pieces: "pcs",
+    lbs: "lbs",
+    pounds: "lbs",
+    pkt: "pkt",
+    packet: "pkt",
+    packets: "pkt",
     bunch: "bunch",
-    clove: "clove",
-    tsp: "tsp",
-    tbsp: "tbsp",
+    bunches: "bunch",
+    case: "case",
+    cases: "case",
+    gal: "gal",
+    gallon: "gal",
+    gallons: "gal",
+    oz: "oz",
+    ounce: "oz",
+    ounces: "oz",
+    g: "g",
+    gram: "g",
+    grams: "g",
+    btl: "btl",
+    bottle: "btl",
+    bottles: "btl",
+    can: "can",
+    cans: "can",
+    pc: "pc",
+    pcs: "pc",
+    piece: "pc",
+    pieces: "pc",
+    box: "box",
+    boxes: "box",
+    ct: "ct",
+    count: "ct",
+    kg: "kg",
+    kilogram: "kg",
+    kilograms: "kg",
+    // Legacy / no longer in canonical list → default to pieces
+    ml: "pc",
+    l: "pc",
+    clove: "pc",
+    tsp: "pc",
+    tbsp: "pc",
   };
 
   const lower = unit.toLowerCase().trim();
-  return unitMap[lower] || "pcs";
+  return unitMap[lower] || "pc";
 }
 
 async function seedIngredients() {

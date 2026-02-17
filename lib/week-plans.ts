@@ -2,6 +2,34 @@ import { ObjectId } from "mongodb";
 import { getDb } from "./mongodb";
 import type { WeekPlanRecord, WeekPlanDay, DayType } from "./interfaces/cart";
 
+function toUtcDateOnly(date: Date): Date {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()));
+}
+
+export function normalizeToMonday(date: Date): Date {
+  const d = toUtcDateOnly(date);
+  const day = d.getUTCDay();
+  const delta = day === 0 ? -6 : 1 - day;
+  d.setUTCDate(d.getUTCDate() + delta);
+  return toUtcDateOnly(d);
+}
+
+export function getWeekRangeFromAnyDate(date: Date) {
+  const monday = normalizeToMonday(date);
+  const sunday = new Date(monday);
+  sunday.setUTCDate(sunday.getUTCDate() + 6);
+  return { monday, sunday };
+}
+
+export function formatDefaultWeekPlanName(monday: Date): string {
+  return `Week of ${monday.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    timeZone: "UTC",
+  })}`;
+}
+
 /**
  * Get week_plans collection
  */
@@ -104,6 +132,36 @@ function normalizeDays(
   }));
 }
 
+export async function countPlansForWeek(
+  monday: Date,
+  excludeId?: ObjectId
+): Promise<{ fullWeekCount: number; singleDayCount: number }> {
+  const weekPlans = getWeekPlansCollection();
+  const sunday = new Date(monday);
+  sunday.setUTCDate(sunday.getUTCDate() + 6);
+
+  const query: Record<string, unknown> = {
+    weekStartDate: {
+      $gte: monday,
+      $lte: sunday,
+    },
+  };
+
+  if (excludeId) {
+    query._id = { $ne: excludeId };
+  }
+
+  const plans = await weekPlans.find(query).toArray();
+  return plans.reduce(
+    (acc, plan) => {
+      if (plan.days.length === 7) acc.fullWeekCount += 1;
+      if (plan.days.length === 1) acc.singleDayCount += 1;
+      return acc;
+    },
+    { fullWeekCount: 0, singleDayCount: 0 }
+  );
+}
+
 /**
  * Create a new week plan (admin only)
  */
@@ -111,9 +169,14 @@ export async function createWeekPlan(
   data: Omit<WeekPlanRecord, "_id" | "createdAt">
 ): Promise<ObjectId> {
   const weekPlans = getWeekPlansCollection();
+  const normalizedWeekStartDate = normalizeToMonday(data.weekStartDate);
+  const finalName =
+    data.name?.trim() || formatDefaultWeekPlanName(normalizedWeekStartDate);
 
   const weekPlan: WeekPlanRecord = {
     ...data,
+    weekStartDate: normalizedWeekStartDate,
+    name: finalName,
     days: normalizeDays(data.days),
     createdAt: new Date(),
   };
@@ -132,6 +195,17 @@ export async function updateWeekPlan(
   const weekPlans = getWeekPlansCollection();
 
   const setUpdates = { ...updates };
+  if (setUpdates.weekStartDate) {
+    const normalizedWeekStartDate = normalizeToMonday(setUpdates.weekStartDate);
+    setUpdates.weekStartDate = normalizedWeekStartDate;
+    if (setUpdates.name === undefined) {
+      setUpdates.name = formatDefaultWeekPlanName(normalizedWeekStartDate);
+    }
+  }
+  if (setUpdates.name !== undefined) {
+    setUpdates.name =
+      typeof setUpdates.name === "string" ? setUpdates.name.trim() : setUpdates.name;
+  }
   if (setUpdates.days) {
     setUpdates.days = normalizeDays(setUpdates.days);
   }

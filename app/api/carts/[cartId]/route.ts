@@ -4,14 +4,40 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getCartById } from "@/lib/carts";
+import { getWeekPlanById } from "@/lib/week-plans";
+import { getUsersCollection } from "@/lib/users";
 import type { CartItemRecord } from "@/lib/interfaces/cart";
+
+function weekLabelFromPlan(
+  weekStartDate: Date,
+  days: Array<{ date: Date }>
+): string {
+  const start =
+    weekStartDate instanceof Date
+      ? weekStartDate
+      : new Date(weekStartDate as unknown as string);
+  if (days.length === 1) {
+    const d = days[0]?.date;
+    const date = d instanceof Date ? d : new Date(d as unknown as string);
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric",
+    });
+  }
+  return `Week of ${start.toLocaleDateString("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  })}`;
+}
 
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ cartId: string }> }
 ) {
   try {
-    // Verify authentication
     const cookieStore = await cookies();
     const token = cookieStore.get(SESSION_COOKIE_NAME);
 
@@ -35,7 +61,6 @@ export async function GET(
 
     const { cart, items } = result;
 
-    // Verify user has access to this cart
     if (
       user.role !== "admin" &&
       cart.cookId.toString() !== user.id
@@ -43,13 +68,26 @@ export async function GET(
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
+    const cartPayload = {
+      ...cart,
+      _id: cart._id!.toString(),
+      weekPlanId: cart.weekPlanId.toString(),
+      cookId: cart.cookId.toString(),
+    };
+
+    if (user.role === "admin") {
+      const [cookUser, plan] = await Promise.all([
+        getUsersCollection().then((u) => u.findOne({ _id: cart.cookId })),
+        getWeekPlanById(cart.weekPlanId),
+      ]);
+      (cartPayload as Record<string, unknown>).cookName = cookUser?.name ?? "Unknown";
+      (cartPayload as Record<string, unknown>).weekLabel = plan
+        ? weekLabelFromPlan(plan.weekStartDate, plan.days ?? [])
+        : null;
+    }
+
     return NextResponse.json({
-      cart: {
-        ...cart,
-        _id: cart._id!.toString(),
-        weekPlanId: cart.weekPlanId.toString(),
-        cookId: cart.cookId.toString(),
-      },
+      cart: cartPayload,
       items: items.map((item: CartItemRecord) => ({
         ...item,
         _id: item._id!.toString(),

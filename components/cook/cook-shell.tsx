@@ -26,7 +26,7 @@ function CookFooter() {
           <Button
             variant="outline"
             size="default"
-            className="h-12 w-full gap-2 text-base"
+            className="h-12 w-full gap-2 text-base bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background disabled:opacity-50"
             disabled={!hasCart}
             onClick={() => data.openViewCartSheet()}
           >
@@ -38,7 +38,7 @@ function CookFooter() {
           <Button
             variant="outline"
             size="default"
-            className="h-12 w-full gap-2 text-base"
+            className="h-12 w-full gap-2 text-base bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background disabled:opacity-50"
             disabled={!hasCart}
             onClick={() => cartId && router.push(`/cook/cart/${cartId}/edit`)}
           >
@@ -105,7 +105,7 @@ export function CookShell({ children }: { children: React.ReactNode }) {
           <button
             type="button"
             onClick={handleBack}
-            className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg text-slate-600 hover:bg-slate-100 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
+            className="flex min-h-[40px] min-w-[40px] items-center justify-center rounded-lg bg-slate-600 text-white hover:bg-slate-900 hover:text-slate-100 focus:outline-none focus:ring-2 focus:ring-slate-300 focus:ring-offset-2"
             aria-label="Go back"
           >
             <ArrowLeft className="h-5 w-5" />

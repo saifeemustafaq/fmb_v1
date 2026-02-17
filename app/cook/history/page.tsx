@@ -108,7 +108,7 @@ export default function CookHistoryPage() {
     <main className="min-h-screen bg-white px-4 py-6 text-slate-900">
       <div className="mx-auto w-full max-w-2xl">
         <div className="mb-6 flex items-center gap-3">
-          <Button variant="ghost" size="icon" asChild>
+          <Button variant="ghost" size="icon" asChild className="bg-foreground text-background hover:bg-foreground/90 hover:text-background">
             <Link href="/cook" aria-label="Back to dashboard">
               <ArrowLeft className="h-5 w-5" />
             </Link>

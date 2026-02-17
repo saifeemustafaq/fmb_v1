@@ -20,21 +20,21 @@ export function NavFooter({ homePath }: NavFooterProps) {
         {!isHome ? (
           <Button
             variant="outline"
-            size="sm"
+            size="default"
             onClick={() => router.back()}
-            className="h-9 w-full gap-1.5"
+            className="h-12 w-full gap-2 text-base bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background"
           >
-            <ArrowLeft className="h-4 w-4 shrink-0" />
+            <ArrowLeft className="h-5 w-5 shrink-0" />
             Back
           </Button>
         ) : (
-          <div className="h-9" aria-hidden />
+          <div className="h-12 min-h-12" aria-hidden />
         )}
       </div>
       <div className="min-w-0">
-        <Button variant="outline" size="sm" asChild className="h-9 w-full gap-1.5">
+        <Button variant="outline" size="default" asChild className="h-12 w-full gap-2 text-base bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background">
           <Link href={homePath}>
-            <Home className="h-4 w-4 shrink-0" />
+            <Home className="h-5 w-5 shrink-0" />
             Home
           </Link>
         </Button>

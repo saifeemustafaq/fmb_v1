@@ -332,7 +332,7 @@ export function ContinueCartPageContent({
       <main className="flex min-h-screen flex-col bg-white text-slate-900">
         <div className="mx-auto flex w-full max-w-4xl flex-1 flex-col min-h-0 px-4 py-4 sm:py-6">
           <div className="shrink-0 mb-4 flex items-center gap-3">
-            <Button variant="ghost" size="icon" asChild>
+            <Button variant="ghost" size="icon" asChild className="bg-foreground text-background hover:bg-foreground/90 hover:text-background">
               <Link href="/cook" aria-label="Back to dashboard">
                 <ArrowLeft className="h-5 w-5" />
               </Link>

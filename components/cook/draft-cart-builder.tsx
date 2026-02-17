@@ -189,13 +189,13 @@ export function DraftCartBuilder({
               variant="outline"
               size="default"
               onClick={onOpenCart}
-              className="h-12 w-full gap-2 text-base"
+              className="h-12 w-full gap-2 text-base bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background"
               aria-label={`View cart (${cartItems.length} ${cartItems.length === 1 ? "item" : "items"})`}
             >
               <ShoppingCart className="h-5 w-5 shrink-0" />
               View cart
             </Button>
-            <Button variant="outline" size="default" asChild className="h-12 w-full gap-2 text-base">
+            <Button variant="outline" size="default" asChild className="h-12 w-full gap-2 text-base bg-foreground text-background border-foreground hover:bg-foreground/90 hover:text-background">
               <Link href="/cook" aria-label="Home">
                 <Home className="h-5 w-5 shrink-0" />
                 Home
@@ -212,12 +212,12 @@ export function DraftCartBuilder({
                 type="button"
                 variant="default"
                 onClick={onOpenCart}
-                className="h-11 text-sm font-medium"
+                className="h-11 text-sm font-medium bg-primary-foreground text-primary hover:bg-primary-foreground/90 hover:text-primary"
                 aria-label={`View cart (${cartItems.length} ${cartItems.length === 1 ? "item" : "items"})`}
               >
                 <ShoppingCart className="mr-1.5 h-4 w-4" />
                 View cart
-                <span className="ml-1 text-xs text-slate-500">({cartItems.length})</span>
+                <span className="ml-1 text-xs opacity-80">({cartItems.length})</span>
               </Button>
               <Button
                 type="button"

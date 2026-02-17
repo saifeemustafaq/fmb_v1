@@ -13,7 +13,7 @@ import {
 } from "@/lib/carts";
 
 const updateItemSchema = z.object({
-  quantity: z.number().positive().optional(),
+  quantity: z.number().min(0).optional(),
   unit: z.string().min(1).optional(),
   categorySnapshot: z.string().optional(),
   storeIdSnapshot: z.string().nullable().optional(),

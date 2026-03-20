@@ -9,6 +9,7 @@ import {
   getStoresList,
   createIngredient,
 } from "@/lib/ingredients";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const createIngredientSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -55,39 +56,41 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const [ingredients, stores] = await Promise.all([
-      getAllIngredientsForAdmin(),
-      getStoresList(),
-    ]);
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const [ingredients, stores] = await Promise.all([
+        getAllIngredientsForAdmin(),
+        getStoresList(),
+      ]);
 
-    const storeById = Object.fromEntries(
-      stores.map((s) => [s._id.toString(), s.name])
-    );
+      const storeById = Object.fromEntries(
+        stores.map((s) => [s._id.toString(), s.name])
+      );
 
-    const serialized = ingredients.map((ing) => ({
-      _id: ing._id!.toString(),
-      name: ing.name,
-      category: ing.category,
-      defaultUnit: ing.defaultUnit,
-      storeId: ing.storeId?.toString() ?? null,
-      storeName: ing.storeId ? storeById[ing.storeId.toString()] ?? null : null,
-      notes: ing.notes ?? "",
-      visibility: ing.visibility,
-      status: ing.status,
-      ownerUserId: ing.ownerUserId?.toString() ?? null,
-      stockOnHand: ing.stockOnHand ?? null,
-      reorderThreshold: ing.reorderThreshold ?? null,
-      createdBy: ing.createdBy?.toString() ?? null,
-      createdAt: ing.createdAt.toISOString(),
-    }));
+      const serialized = ingredients.map((ing) => ({
+        _id: ing._id!.toString(),
+        name: ing.name,
+        category: ing.category,
+        defaultUnit: ing.defaultUnit,
+        storeId: ing.storeId?.toString() ?? null,
+        storeName: ing.storeId ? storeById[ing.storeId.toString()] ?? null : null,
+        notes: ing.notes ?? "",
+        visibility: ing.visibility,
+        status: ing.status,
+        ownerUserId: ing.ownerUserId?.toString() ?? null,
+        stockOnHand: ing.stockOnHand ?? null,
+        reorderThreshold: ing.reorderThreshold ?? null,
+        createdBy: ing.createdBy?.toString() ?? null,
+        createdAt: ing.createdAt.toISOString(),
+      }));
 
-    const storesSerialized = stores.map((s) => ({
-      _id: s._id.toString(),
-      name: s.name,
-    }));
-    return NextResponse.json({
-      ingredients: serialized,
-      stores: storesSerialized,
+      const storesSerialized = stores.map((s) => ({
+        _id: s._id.toString(),
+        name: s.name,
+      }));
+      return NextResponse.json({
+        ingredients: serialized,
+        stores: storesSerialized,
+      });
     });
   } catch (error) {
     console.error("Error listing admin ingredients:", error);
@@ -122,28 +125,30 @@ export async function POST(request: Request) {
     }
 
     const data = parsed.data;
-    const created = await createIngredient(
-      {
-        name: data.name,
-        category: data.category,
-        defaultUnit: data.defaultUnit,
-        storeId: data.storeId ? new ObjectId(data.storeId) : null,
-        notes: data.notes,
-        visibility: data.visibility,
-        status: data.status,
-        stockOnHand: data.stockOnHand,
-        reorderThreshold: data.reorderThreshold,
-      },
-      user.id ? new ObjectId(user.id) : undefined
-    );
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const created = await createIngredient(
+        {
+          name: data.name,
+          category: data.category,
+          defaultUnit: data.defaultUnit,
+          storeId: data.storeId ? new ObjectId(data.storeId) : null,
+          notes: data.notes,
+          visibility: data.visibility,
+          status: data.status,
+          stockOnHand: data.stockOnHand,
+          reorderThreshold: data.reorderThreshold,
+        },
+        user.id ? new ObjectId(user.id) : undefined
+      );
 
-    const stores = await getStoresList();
-    const storeById = Object.fromEntries(
-      stores.map((s) => [s._id.toString(), s.name])
-    );
+      const stores = await getStoresList();
+      const storeById = Object.fromEntries(
+        stores.map((s) => [s._id.toString(), s.name])
+      );
 
-    return NextResponse.json({
-      ingredient: serializeIngredient(created, storeById),
+      return NextResponse.json({
+        ingredient: serializeIngredient(created, storeById),
+      });
     });
   } catch (error) {
     console.error("Error creating ingredient:", error);

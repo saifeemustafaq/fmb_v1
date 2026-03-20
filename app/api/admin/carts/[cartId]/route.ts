@@ -5,6 +5,7 @@ import { z } from "zod";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { updateCartStatus, updateCartNotes } from "@/lib/carts";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const patchSchema = z.object({
   status: z.enum(["submitted", "finalized"]).optional(),
@@ -43,30 +44,32 @@ export async function PATCH(
 
     const cartObjectId = new ObjectId(cartId);
 
-    if (parsed.data.status !== undefined) {
-      const success = await updateCartStatus(cartObjectId, parsed.data.status);
-      if (!success) {
-        return NextResponse.json(
-          { error: "Cart not found or status transition not allowed" },
-          { status: 404 }
-        );
+    return runWithAppDb(dbNameForSession(user), async () => {
+      if (parsed.data.status !== undefined) {
+        const success = await updateCartStatus(cartObjectId, parsed.data.status);
+        if (!success) {
+          return NextResponse.json(
+            { error: "Cart not found or status transition not allowed" },
+            { status: 404 }
+          );
+        }
       }
-    }
 
-    if (parsed.data.notes !== undefined) {
-      const success = await updateCartNotes(
-        cartObjectId,
-        parsed.data.notes
-      );
-      if (!success) {
-        return NextResponse.json(
-          { error: "Cart not found" },
-          { status: 404 }
+      if (parsed.data.notes !== undefined) {
+        const success = await updateCartNotes(
+          cartObjectId,
+          parsed.data.notes
         );
+        if (!success) {
+          return NextResponse.json(
+            { error: "Cart not found" },
+            { status: 404 }
+          );
+        }
       }
-    }
 
-    return NextResponse.json({ message: "Cart updated" });
+      return NextResponse.json({ message: "Cart updated" });
+    });
   } catch (error) {
     console.error("Error updating cart:", error);
     return NextResponse.json(

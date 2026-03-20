@@ -6,6 +6,7 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getWeekPlanById } from "@/lib/week-plans";
 import { getCartsByWeekPlan } from "@/lib/carts";
 import { getUsersCollection } from "@/lib/users";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function GET(
   request: Request,
@@ -29,31 +30,33 @@ export async function GET(
     }
 
     const weekPlanObjectId = new ObjectId(weekPlanId);
-    const plan = await getWeekPlanById(weekPlanObjectId);
-    if (!plan) {
-      return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const plan = await getWeekPlanById(weekPlanObjectId);
+      if (!plan) {
+        return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
+      }
 
-    const carts = await getCartsByWeekPlan(weekPlanObjectId);
-    const users = await getUsersCollection();
-    const cookIds = [...new Set(carts.map((c) => c.cookId.toString()))];
-    const cookMap = new Map<string, { name: string }>();
-    for (const id of cookIds) {
-      const u = await users.findOne({ _id: new ObjectId(id) });
-      if (u) cookMap.set(id, { name: u.name });
-    }
+      const carts = await getCartsByWeekPlan(weekPlanObjectId);
+      const users = await getUsersCollection();
+      const cookIds = [...new Set(carts.map((c) => c.cookId.toString()))];
+      const cookMap = new Map<string, { name: string }>();
+      for (const id of cookIds) {
+        const u = await users.findOne({ _id: new ObjectId(id) });
+        if (u) cookMap.set(id, { name: u.name });
+      }
 
-    const cartsWithCook = carts.map((cart) => ({
-      _id: cart._id!.toString(),
-      weekPlanId: cart.weekPlanId.toString(),
-      cookId: cart.cookId.toString(),
-      cookName: cookMap.get(cart.cookId.toString())?.name ?? "Unknown",
-      status: cart.status,
-      createdAt: cart.createdAt.toISOString(),
-      updatedAt: cart.updatedAt.toISOString(),
-    }));
+      const cartsWithCook = carts.map((cart) => ({
+        _id: cart._id!.toString(),
+        weekPlanId: cart.weekPlanId.toString(),
+        cookId: cart.cookId.toString(),
+        cookName: cookMap.get(cart.cookId.toString())?.name ?? "Unknown",
+        status: cart.status,
+        createdAt: cart.createdAt.toISOString(),
+        updatedAt: cart.updatedAt.toISOString(),
+      }));
 
-    return NextResponse.json({ carts: cartsWithCook });
+      return NextResponse.json({ carts: cartsWithCook });
+    });
   } catch (error) {
     console.error("Error fetching carts for week plan:", error);
     return NextResponse.json(

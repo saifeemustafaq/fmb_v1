@@ -5,6 +5,7 @@ import { z } from "zod";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { addPrivateIngredient } from "@/lib/ingredients";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const privateIngredientSchema = z.object({
   name: z.string().min(1),
@@ -40,33 +41,35 @@ export async function POST(request: Request) {
       );
     }
 
-    const ingredient = await addPrivateIngredient(
-      {
-        name: parsed.data.name,
-        category: parsed.data.category,
-        defaultUnit: parsed.data.defaultUnit,
-        notes: parsed.data.notes || "",
-        storeId: null,
-        status: "pending",
-        visibility: "private",
-        ownerUserId: null, // Will be set by addPrivateIngredient
-      },
-      new ObjectId(user.id)
-    );
-
-    return NextResponse.json(
-      {
-        ingredient: {
-          ...ingredient,
-          _id: ingredient._id!.toString(),
-          storeId: ingredient.storeId?.toString() || null,
-          ownerUserId: ingredient.ownerUserId?.toString() || null,
-          createdBy: ingredient.createdBy?.toString() || null,
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const ingredient = await addPrivateIngredient(
+        {
+          name: parsed.data.name,
+          category: parsed.data.category,
+          defaultUnit: parsed.data.defaultUnit,
+          notes: parsed.data.notes || "",
+          storeId: null,
+          status: "pending",
+          visibility: "private",
+          ownerUserId: null,
         },
-        message: "Private ingredient created (pending approval)",
-      },
-      { status: 201 }
-    );
+        new ObjectId(user.id)
+      );
+
+      return NextResponse.json(
+        {
+          ingredient: {
+            ...ingredient,
+            _id: ingredient._id!.toString(),
+            storeId: ingredient.storeId?.toString() || null,
+            ownerUserId: ingredient.ownerUserId?.toString() || null,
+            createdBy: ingredient.createdBy?.toString() || null,
+          },
+          message: "Private ingredient created (pending approval)",
+        },
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error("Error creating private ingredient:", error);
     return NextResponse.json(

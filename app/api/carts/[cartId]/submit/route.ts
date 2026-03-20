@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { submitCart, getCartById } from "@/lib/carts";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function PATCH(
   request: Request,
@@ -27,33 +28,33 @@ export async function PATCH(
 
     const cartObjectId = new ObjectId(cartId);
 
-    // Verify cart exists and user has access
-    const cartResult = await getCartById(cartObjectId);
-    if (!cartResult) {
-      return NextResponse.json({ error: "Cart not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const cartResult = await getCartById(cartObjectId);
+      if (!cartResult) {
+        return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+      }
 
-    const { cart } = cartResult;
+      const { cart } = cartResult;
 
-    if (
-      user.role !== "admin" &&
-      cart.cookId.toString() !== user.id
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+      if (
+        user.role !== "admin" &&
+        cart.cookId.toString() !== user.id
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
 
-    // Submit cart
-    const success = await submitCart(cartObjectId);
+      const success = await submitCart(cartObjectId);
 
-    if (!success) {
-      return NextResponse.json(
-        { error: "Cart already submitted or not found" },
-        { status: 400 }
-      );
-    }
+      if (!success) {
+        return NextResponse.json(
+          { error: "Cart already submitted or not found" },
+          { status: 400 }
+        );
+      }
 
-    return NextResponse.json({
-      message: "Cart submitted successfully",
+      return NextResponse.json({
+        message: "Cart submitted successfully",
+      });
     });
   } catch (error) {
     console.error("Error submitting cart:", error);

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getStoresForAdmin, createStore } from "@/lib/ingredients";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const createStoreSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -26,17 +27,19 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const stores = await getStoresForAdmin();
-    const serialized = stores.map((s) => ({
-      _id: s._id.toString(),
-      name: s.name,
-      address: s.address ?? "",
-      notes: s.notes ?? "",
-      isActive: s.isActive ?? true,
-      createdAt: s.createdAt ? (s.createdAt as Date).toISOString() : null,
-    }));
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const stores = await getStoresForAdmin();
+      const serialized = stores.map((s) => ({
+        _id: s._id.toString(),
+        name: s.name,
+        address: s.address ?? "",
+        notes: s.notes ?? "",
+        isActive: s.isActive ?? true,
+        createdAt: s.createdAt ? (s.createdAt as Date).toISOString() : null,
+      }));
 
-    return NextResponse.json({ stores: serialized });
+      return NextResponse.json({ stores: serialized });
+    });
   } catch (error) {
     console.error("Error listing admin stores:", error);
     return NextResponse.json(
@@ -69,16 +72,18 @@ export async function POST(request: Request) {
       );
     }
 
-    const created = await createStore(parsed.data);
-    return NextResponse.json({
-      store: {
-        _id: created._id.toString(),
-        name: created.name,
-        address: created.address ?? "",
-        notes: created.notes ?? "",
-        isActive: created.isActive ?? true,
-        createdAt: created.createdAt ? (created.createdAt as Date).toISOString() : null,
-      },
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const created = await createStore(parsed.data);
+      return NextResponse.json({
+        store: {
+          _id: created._id.toString(),
+          name: created.name,
+          address: created.address ?? "",
+          notes: created.notes ?? "",
+          isActive: created.isActive ?? true,
+          createdAt: created.createdAt ? (created.createdAt as Date).toISOString() : null,
+        },
+      });
     });
   } catch (error) {
     console.error("Error creating store:", error);

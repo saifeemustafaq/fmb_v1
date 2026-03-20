@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getIngredientById, updateIngredient, deleteIngredient } from "@/lib/ingredients";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const updateIngredientSchema = z.object({
   name: z.string().min(1).optional(),
@@ -40,27 +41,29 @@ export async function GET(
       return NextResponse.json({ error: "Invalid ingredient ID" }, { status: 400 });
     }
 
-    const ingredient = await getIngredientById(id);
-    if (!ingredient) {
-      return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const ingredient = await getIngredientById(id);
+      if (!ingredient) {
+        return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({
-      ingredient: {
-        _id: ingredient._id!.toString(),
-        name: ingredient.name,
-        category: ingredient.category,
-        defaultUnit: ingredient.defaultUnit,
-        storeId: ingredient.storeId?.toString() ?? null,
-        notes: ingredient.notes ?? "",
-        visibility: ingredient.visibility,
-        status: ingredient.status,
-        ownerUserId: ingredient.ownerUserId?.toString() ?? null,
-        stockOnHand: ingredient.stockOnHand ?? null,
-        reorderThreshold: ingredient.reorderThreshold ?? null,
-        createdBy: ingredient.createdBy?.toString() ?? null,
-        createdAt: ingredient.createdAt.toISOString(),
-      },
+      return NextResponse.json({
+        ingredient: {
+          _id: ingredient._id!.toString(),
+          name: ingredient.name,
+          category: ingredient.category,
+          defaultUnit: ingredient.defaultUnit,
+          storeId: ingredient.storeId?.toString() ?? null,
+          notes: ingredient.notes ?? "",
+          visibility: ingredient.visibility,
+          status: ingredient.status,
+          ownerUserId: ingredient.ownerUserId?.toString() ?? null,
+          stockOnHand: ingredient.stockOnHand ?? null,
+          reorderThreshold: ingredient.reorderThreshold ?? null,
+          createdBy: ingredient.createdBy?.toString() ?? null,
+          createdAt: ingredient.createdAt.toISOString(),
+        },
+      });
     });
   } catch (error) {
     console.error("Error fetching ingredient:", error);
@@ -116,27 +119,29 @@ export async function PATCH(
     if (updates.stockOnHand !== undefined) updatePayload.stockOnHand = updates.stockOnHand;
     if (updates.reorderThreshold !== undefined) updatePayload.reorderThreshold = updates.reorderThreshold;
 
-    const updated = await updateIngredient(id, updatePayload);
-    if (!updated) {
-      return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const updated = await updateIngredient(id, updatePayload);
+      if (!updated) {
+        return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({
-      ingredient: {
-        _id: updated._id!.toString(),
-        name: updated.name,
-        category: updated.category,
-        defaultUnit: updated.defaultUnit,
-        storeId: updated.storeId?.toString() ?? null,
-        notes: updated.notes ?? "",
-        visibility: updated.visibility,
-        status: updated.status,
-        ownerUserId: updated.ownerUserId?.toString() ?? null,
-        stockOnHand: updated.stockOnHand ?? null,
-        reorderThreshold: updated.reorderThreshold ?? null,
-        createdBy: updated.createdBy?.toString() ?? null,
-        createdAt: updated.createdAt.toISOString(),
-      },
+      return NextResponse.json({
+        ingredient: {
+          _id: updated._id!.toString(),
+          name: updated.name,
+          category: updated.category,
+          defaultUnit: updated.defaultUnit,
+          storeId: updated.storeId?.toString() ?? null,
+          notes: updated.notes ?? "",
+          visibility: updated.visibility,
+          status: updated.status,
+          ownerUserId: updated.ownerUserId?.toString() ?? null,
+          stockOnHand: updated.stockOnHand ?? null,
+          reorderThreshold: updated.reorderThreshold ?? null,
+          createdBy: updated.createdBy?.toString() ?? null,
+          createdAt: updated.createdAt.toISOString(),
+        },
+      });
     });
   } catch (error) {
     console.error("Error updating ingredient:", error);
@@ -169,12 +174,14 @@ export async function DELETE(
       return NextResponse.json({ error: "Invalid ingredient ID" }, { status: 400 });
     }
 
-    const deleted = await deleteIngredient(id);
-    if (!deleted) {
-      return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const deleted = await deleteIngredient(id);
+      if (!deleted) {
+        return NextResponse.json({ error: "Ingredient not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({ success: true });
+      return NextResponse.json({ success: true });
+    });
   } catch (error) {
     console.error("Error deleting ingredient:", error);
     return NextResponse.json(

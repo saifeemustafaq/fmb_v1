@@ -5,6 +5,7 @@ import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getWeekPlanById } from "@/lib/week-plans";
 import { getCombinedCartForWeekPlan } from "@/lib/carts";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function GET(
   request: Request,
@@ -31,37 +32,39 @@ export async function GET(
     }
 
     const weekPlanObjectId = new ObjectId(weekPlanId);
-    const plan = await getWeekPlanById(weekPlanObjectId);
-    if (!plan) {
-      return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
-    }
-
-    const items = await getCombinedCartForWeekPlan(weekPlanObjectId, {
-      includeSources,
-    });
-
-    const serialized = items.map((item) => {
-      const out: Record<string, unknown> = {
-        ingredientId: item.ingredientId.toString(),
-        nameSnapshot: item.nameSnapshot,
-        categorySnapshot: item.categorySnapshot,
-        storeIdSnapshot: item.storeIdSnapshot?.toString() ?? null,
-        quantityRequested: item.quantityRequested,
-        unit: item.unit,
-        quantityToBuy: item.quantityToBuy,
-      };
-      if (item.sourceCartIds?.length) {
-        out.sourceCartIds = item.sourceCartIds.map((id) => id.toString());
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const plan = await getWeekPlanById(weekPlanObjectId);
+      if (!plan) {
+        return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
       }
-      if (item.sourceCookIds?.length) {
-        out.sourceCookIds = item.sourceCookIds.map((id) => id.toString());
-      }
-      return out;
-    });
 
-    return NextResponse.json({
-      weekPlanId: weekPlanId,
-      items: serialized,
+      const items = await getCombinedCartForWeekPlan(weekPlanObjectId, {
+        includeSources,
+      });
+
+      const serialized = items.map((item) => {
+        const out: Record<string, unknown> = {
+          ingredientId: item.ingredientId.toString(),
+          nameSnapshot: item.nameSnapshot,
+          categorySnapshot: item.categorySnapshot,
+          storeIdSnapshot: item.storeIdSnapshot?.toString() ?? null,
+          quantityRequested: item.quantityRequested,
+          unit: item.unit,
+          quantityToBuy: item.quantityToBuy,
+        };
+        if (item.sourceCartIds?.length) {
+          out.sourceCartIds = item.sourceCartIds.map((id) => id.toString());
+        }
+        if (item.sourceCookIds?.length) {
+          out.sourceCookIds = item.sourceCookIds.map((id) => id.toString());
+        }
+        return out;
+      });
+
+      return NextResponse.json({
+        weekPlanId: weekPlanId,
+        items: serialized,
+      });
     });
   } catch (error) {
     console.error("Error fetching combined cart:", error);

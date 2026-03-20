@@ -1,4 +1,5 @@
 import clientPromise from "@/lib/mongodb";
+import { getAppDbName } from "@/lib/app-db-context";
 import { ObjectId } from "mongodb";
 import type { IngredientRecord } from "@/lib/interfaces/ingredient";
 
@@ -7,7 +8,7 @@ import type { IngredientRecord } from "@/lib/interfaces/ingredient";
  */
 export async function getIngredientsCollection() {
   const client = await clientPromise;
-  return client.db("fmb").collection<IngredientRecord>("ingredients");
+  return client.db(getAppDbName()).collection<IngredientRecord>("ingredients");
 }
 
 /**
@@ -15,7 +16,7 @@ export async function getIngredientsCollection() {
  */
 export async function getStoresCollection() {
   const client = await clientPromise;
-  return client.db("fmb").collection("stores");
+  return client.db(getAppDbName()).collection("stores");
 }
 
 /**

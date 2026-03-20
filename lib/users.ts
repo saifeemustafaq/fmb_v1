@@ -1,4 +1,5 @@
 import clientPromise from "@/lib/mongodb";
+import { getAppDbName } from "@/lib/app-db-context";
 import { ObjectId } from "mongodb";
 import type { Role } from "@/lib/auth/constants";
 import { hashPassword } from "@/lib/auth";
@@ -11,7 +12,7 @@ import type {
 
 export async function getUsersCollection() {
   const client = await clientPromise;
-  return client.db("fmb").collection<UserRecord>("users");
+  return client.db(getAppDbName()).collection<UserRecord>("users");
 }
 
 export async function findUserByITS(its: number) {

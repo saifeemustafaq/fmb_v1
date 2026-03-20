@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { createIngredient } from "@/lib/ingredients";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const importItemSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -43,32 +44,35 @@ export async function POST(request: Request) {
 
     const { ingredients: items } = parsed.data;
     const createdBy = user.id ? new ObjectId(user.id) : undefined;
-    const errors: { index: number; message: string }[] = [];
-    let created = 0;
 
-    for (let i = 0; i < items.length; i++) {
-      const item = items[i];
-      try {
-        await createIngredient(
-          {
-            name: item.name,
-            category: item.category,
-            defaultUnit: item.defaultUnit,
-            storeId: item.storeId ? new ObjectId(item.storeId) : null,
-            notes: item.notes ?? "",
-          },
-          createdBy
-        );
-        created++;
-      } catch (err) {
-        errors.push({
-          index: i,
-          message: err instanceof Error ? err.message : "Failed to create",
-        });
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const errors: { index: number; message: string }[] = [];
+      let created = 0;
+
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        try {
+          await createIngredient(
+            {
+              name: item.name,
+              category: item.category,
+              defaultUnit: item.defaultUnit,
+              storeId: item.storeId ? new ObjectId(item.storeId) : null,
+              notes: item.notes ?? "",
+            },
+            createdBy
+          );
+          created++;
+        } catch (err) {
+          errors.push({
+            index: i,
+            message: err instanceof Error ? err.message : "Failed to create",
+          });
+        }
       }
-    }
 
-    return NextResponse.json({ created, errors });
+      return NextResponse.json({ created, errors });
+    });
   } catch (error) {
     console.error("Error importing ingredients:", error);
     return NextResponse.json(

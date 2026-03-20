@@ -6,6 +6,9 @@
  */
 
 import { MongoClient } from "mongodb";
+import { loadProjectEnv } from "./load-project-env.mjs";
+
+loadProjectEnv();
 
 const MONGODB_URI = process.env.MONGODB_URI;
 

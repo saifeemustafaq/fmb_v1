@@ -8,7 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
-import { CartItemsList, type CartItemDisplay } from "@/components/admin/cart-items-list";
+import {
+  AdminCartItemsEditable,
+  type AdminCartItemEditable,
+} from "@/components/admin/admin-cart-items-editable";
+import { CartItemsList } from "@/components/admin/cart-items-list";
 
 type CartDetail = {
   _id: string;
@@ -22,14 +26,34 @@ type CartDetail = {
   updatedAt: string;
 };
 
+type RawItem = {
+  _id: string;
+  nameSnapshot: string;
+  quantityRequested: number;
+  unit: string;
+  categorySnapshot?: string;
+};
+
+function toEditableItems(raw: RawItem[]): AdminCartItemEditable[] {
+  return raw.map((it) => ({
+    _id: it._id,
+    nameSnapshot: it.nameSnapshot,
+    quantityRequested: it.quantityRequested,
+    unit: it.unit,
+    categorySnapshot: it.categorySnapshot ?? undefined,
+    originalQuantity: it.quantityRequested,
+  }));
+}
+
 export default function AdminCartDetailPage() {
   const params = useParams();
   const cartId = params.cartId as string;
 
   const [cart, setCart] = useState<CartDetail | null>(null);
-  const [items, setItems] = useState<CartItemDisplay[]>([]);
+  const [items, setItems] = useState<AdminCartItemEditable[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [updatingItemId, setUpdatingItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!cartId) return;
@@ -42,21 +66,7 @@ export default function AdminCartDetailPage() {
         const data = await res.json();
         setCart(data.cart);
         const raw = data.items ?? [];
-        setItems(
-          raw.map(
-            (it: {
-              nameSnapshot: string;
-              quantityRequested: number;
-              unit: string;
-              categorySnapshot?: string;
-            }) => ({
-              nameSnapshot: it.nameSnapshot,
-              quantityRequested: it.quantityRequested,
-              unit: it.unit,
-              categorySnapshot: it.categorySnapshot ?? undefined,
-            })
-          )
-        );
+        setItems(toEditableItems(raw));
       } catch (err) {
         console.error(err);
         setError("Failed to load cart.");
@@ -66,6 +76,30 @@ export default function AdminCartDetailPage() {
     };
     fetchCart();
   }, [cartId]);
+
+  const handleQuantityChange = async (itemId: string, newQuantity: number) => {
+    if (!cartId || cart?.status === "finalized") return;
+    setUpdatingItemId(itemId);
+    try {
+      const res = await fetch(`/api/carts/${cartId}/items/${itemId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ quantity: newQuantity }),
+      });
+      if (!res.ok) throw new Error("Failed to update");
+      setItems((prev) =>
+        prev.map((it) =>
+          it._id === itemId
+            ? { ...it, quantityRequested: newQuantity }
+            : it
+        )
+      );
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setUpdatingItemId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -140,11 +174,26 @@ export default function AdminCartDetailPage() {
                 <p className="mt-1">{cart.notes}</p>
               </div>
             ) : null}
-            <CartItemsList
-              items={items}
-              emptyMessage="No items in this cart."
-              itemKeyPrefix={cart._id}
-            />
+            {cart.status === "finalized" ? (
+              <CartItemsList
+                items={items.map((it) => ({
+                  nameSnapshot: it.nameSnapshot,
+                  quantityRequested: it.quantityRequested,
+                  unit: it.unit,
+                  categorySnapshot: it.categorySnapshot,
+                }))}
+                emptyMessage="No items in this cart."
+                itemKeyPrefix={cart._id}
+              />
+            ) : (
+              <AdminCartItemsEditable
+                items={items}
+                emptyMessage="No items in this cart."
+                itemKeyPrefix={cart._id}
+                onQuantityChange={handleQuantityChange}
+                isUpdating={updatingItemId !== null}
+              />
+            )}
           </CardContent>
         </Card>
 

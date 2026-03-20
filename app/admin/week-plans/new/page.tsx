@@ -45,6 +45,14 @@ function getWeekDates(mondayStr: string): string[] {
   return out;
 }
 
+function normalizeToMondayDateString(dateStr: string): string {
+  const d = new Date(dateStr + "T12:00:00");
+  const day = d.getDay();
+  const toMonday = day === 0 ? -6 : 1 - day;
+  d.setDate(d.getDate() + toMonday);
+  return d.toISOString().slice(0, 10);
+}
+
 function NewWeekPlanContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -55,6 +63,7 @@ function NewWeekPlanContent() {
   const [weekStartDate, setWeekStartDate] = useState<string>("");
   const [singleDate, setSingleDate] = useState<string>("");
   const [days, setDays] = useState<DayForm[]>([]);
+  const [name, setName] = useState("");
   const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +123,7 @@ function NewWeekPlanContent() {
   useEffect(() => {
     if (defaultCookId && days.length > 0) {
       setDays((prev) =>
-        prev.map((d) => ({ ...d, assignedCookId: d.assignedCookId || defaultCookId }))
+        prev.map((d) => ({ ...d, assignedCookId: defaultCookId }))
       );
     }
   }, [defaultCookId]);
@@ -158,6 +167,7 @@ function NewWeekPlanContent() {
     const payload = {
       weekStartDate: isSingleDay ? singleDate : weekStartDate,
       assignedCookId: defaultCookId,
+      name: name.trim() ? name.trim() : undefined,
       days: days.map((d) => ({
         date: d.date,
         dayType: d.dayType,
@@ -252,12 +262,28 @@ function NewWeekPlanContent() {
                     id="weekStart"
                     type="date"
                     value={weekStartDate}
-                    onChange={(e) => setWeekStartDate(e.target.value)}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setWeekStartDate(value ? normalizeToMondayDateString(value) : "");
+                    }}
                     className="h-12 text-base"
                     required
                   />
                 </div>
               )}
+              <div className="space-y-2">
+                <Label htmlFor="planName">Plan name (optional)</Label>
+                <Input
+                  id="planName"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder={weekStartDate ? `Week of ${new Date(weekStartDate + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}` : "Week of ..."}
+                  className="h-12 text-base"
+                />
+                <p className="text-xs text-slate-500">
+                  Leave empty to use default name: Week of Monday.
+                </p>
+              </div>
               <div className="space-y-2">
                 <Label>Default cook</Label>
                 <Select value={defaultCookId} onValueChange={setDefaultCookId} required>

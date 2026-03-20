@@ -91,6 +91,17 @@ export async function getCartsByWeekPlan(weekPlanId: ObjectId) {
     .toArray();
 }
 
+/**
+ * Get all carts for admin list (current and historical), sorted by updatedAt desc.
+ */
+export async function getAllCartsForAdmin() {
+  const carts = getCartsCollection();
+  return carts
+    .find({})
+    .sort({ updatedAt: -1 })
+    .toArray();
+}
+
 /** Aggregated line for combined cart (merged by ingredientId + unit) */
 export type CombinedCartItem = {
   ingredientId: ObjectId;
@@ -252,6 +263,33 @@ export async function updateCartItemQuantity(
 }
 
 /**
+ * Update cart item unit (e.g. kg, pcs). Admin use.
+ */
+export async function updateCartItemUnit(
+  cartItemId: ObjectId,
+  unit: string
+): Promise<boolean> {
+  const cartItems = getCartItemsCollection();
+
+  const result = await cartItems.updateOne(
+    { _id: cartItemId },
+    { $set: { unit } }
+  );
+
+  if (result.modifiedCount > 0) {
+    const item = await cartItems.findOne({ _id: cartItemId });
+    if (item) {
+      await getCartsCollection().updateOne(
+        { _id: item.cartId },
+        { $set: { updatedAt: new Date() } }
+      );
+    }
+  }
+
+  return result.modifiedCount > 0;
+}
+
+/**
  * Remove item from cart
  */
 export async function removeItemFromCart(
@@ -291,6 +329,65 @@ export async function submitCart(cartId: ObjectId): Promise<boolean> {
     }
   );
 
+  return result.modifiedCount > 0;
+}
+
+/**
+ * Update cart status (admin). Allowed: draft→submitted, submitted→finalized.
+ */
+export async function updateCartStatus(
+  cartId: ObjectId,
+  status: "submitted" | "finalized"
+): Promise<boolean> {
+  const carts = getCartsCollection();
+  const fromStatus = status === "finalized" ? "submitted" : "draft";
+  const result = await carts.updateOne(
+    { _id: cartId, status: fromStatus },
+    { $set: { status, updatedAt: new Date() } }
+  );
+  return result.modifiedCount > 0;
+}
+
+/**
+ * Update cart notes (admin). Persists note on the cart for review and print.
+ */
+export async function updateCartNotes(
+  cartId: ObjectId,
+  notes: string | null
+): Promise<boolean> {
+  const carts = getCartsCollection();
+  const result = await carts.updateOne(
+    { _id: cartId },
+    { $set: { notes: notes ?? null, updatedAt: new Date() } }
+  );
+  return result.modifiedCount > 0;
+}
+
+/**
+ * Update cart item store and/or category (cart_items only; does not change ingredients).
+ */
+export async function updateCartItemStoreAndCategory(
+  cartItemId: ObjectId,
+  updates: { categorySnapshot?: string; storeIdSnapshot?: ObjectId | null }
+): Promise<boolean> {
+  const cartItems = getCartItemsCollection();
+  const set: Record<string, unknown> = {};
+  if (updates.categorySnapshot !== undefined) set.categorySnapshot = updates.categorySnapshot;
+  if (updates.storeIdSnapshot !== undefined) set.storeIdSnapshot = updates.storeIdSnapshot;
+  if (Object.keys(set).length === 0) return true;
+  const result = await cartItems.updateOne(
+    { _id: cartItemId },
+    { $set: set }
+  );
+  if (result.modifiedCount > 0) {
+    const item = await cartItems.findOne({ _id: cartItemId });
+    if (item) {
+      await getCartsCollection().updateOne(
+        { _id: item.cartId },
+        { $set: { updatedAt: new Date() } }
+      );
+    }
+  }
   return result.modifiedCount > 0;
 }
 

@@ -11,6 +11,7 @@ import { Spinner } from "@/components/ui/spinner";
 type WeekPlanSummary = {
   _id: string;
   weekStartDate: string;
+  name?: string;
   assignedCookId: string;
   days: Array<{
     date: string;
@@ -132,7 +133,7 @@ export default function AdminWeekPlansPage() {
                             href={`/admin/week-plans/${plan._id}`}
                             className="hover:underline"
                           >
-                            {isSingleDay ? "Single-day plan" : "Week plan"}
+                            {plan.name?.trim() || (isSingleDay ? "Single-day plan" : "Week plan")}
                           </Link>
                         </CardTitle>
                         <Badge variant={isSingleDay ? "secondary" : "default"}>

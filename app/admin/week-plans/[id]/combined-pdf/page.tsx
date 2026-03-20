@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState, useMemo } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Spinner } from "@/components/ui/spinner";
+import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 
 type CombinedItem = {
   ingredientId: string;
@@ -18,14 +20,25 @@ type CombinedItem = {
   quantityToBuy: number | null;
 };
 
+type Store = { _id: string; name: string };
+
 export default function CombinedPdfPage() {
   const params = useParams();
+  const searchParams = useSearchParams();
   const id = params.id as string;
+  const groupByParam = searchParams.get("groupBy");
+  const initialGroupBy = groupByParam === "store" ? "store" : "category";
 
   const [weekLabel, setWeekLabel] = useState<string>("");
   const [items, setItems] = useState<CombinedItem[]>([]);
+  const [stores, setStores] = useState<Store[]>([]);
+  const [groupBy, setGroupBy] = useState<"category" | "store">(initialGroupBy);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    setGroupBy(initialGroupBy);
+  }, [initialGroupBy]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -33,16 +46,16 @@ export default function CombinedPdfPage() {
       setIsLoading(true);
       setError(null);
       try {
-        const [planRes, cartRes] = await Promise.all([
+        const [planRes, cartRes, storesRes] = await Promise.all([
           fetch(`/api/week-plans/${id}`),
           fetch(`/api/week-plans/${id}/combined-cart`),
+          fetch("/api/admin/stores"),
         ]);
         if (!planRes.ok) throw new Error("Failed to fetch week plan");
         if (!cartRes.ok) throw new Error("Failed to fetch combined cart");
 
         const planData = await planRes.json();
         const cartData = await cartRes.json();
-
         const plan = planData.weekPlan;
         const days = plan?.days ?? [];
         const label =
@@ -55,6 +68,10 @@ export default function CombinedPdfPage() {
 
         setWeekLabel(label);
         setItems(cartData.items ?? []);
+        if (storesRes.ok) {
+          const storesData = await storesRes.json();
+          setStores(storesData.stores ?? []);
+        }
       } catch (err) {
         console.error(err);
         setError("Failed to load combined cart.");
@@ -68,6 +85,14 @@ export default function CombinedPdfPage() {
   const handlePrint = () => {
     window.print();
   };
+
+  const storeNameById = useMemo(
+    () => new Map(stores.map((s) => [s._id, s.name])),
+    [stores]
+  );
+
+  const getStoreName = (storeId: string | null) =>
+    storeId ? storeNameById.get(storeId) ?? "—" : "—";
 
   if (isLoading) {
     return (
@@ -91,25 +116,54 @@ export default function CombinedPdfPage() {
   }
 
   const byCategory = new Map<string, CombinedItem[]>();
+  const byStore = new Map<string, CombinedItem[]>();
   for (const item of items) {
     const cat = item.categorySnapshot || "Other";
     if (!byCategory.has(cat)) byCategory.set(cat, []);
     byCategory.get(cat)!.push(item);
+
+    const storeKey = item.storeIdSnapshot ?? "__none__";
+    if (!byStore.has(storeKey)) byStore.set(storeKey, []);
+    byStore.get(storeKey)!.push(item);
   }
   const categories = [...byCategory.keys()].sort();
+  const storeKeys = [...byStore.keys()].sort((a, b) => {
+    const nameA = a === "__none__" ? "No store" : getStoreName(a);
+    const nameB = b === "__none__" ? "No store" : getStoreName(b);
+    return nameA.localeCompare(nameB);
+  });
 
   return (
     <main className="min-h-screen bg-white px-4 py-6 text-slate-900 print:bg-white print:py-4">
       <div className="mx-auto max-w-2xl">
-        <div className="mb-6 flex items-center justify-between gap-4 print:hidden">
+        <div className="mb-6 flex flex-col gap-4 print:hidden sm:flex-row sm:items-center sm:justify-between">
           <Button variant="ghost" size="icon" asChild>
             <Link href={`/admin/week-plans/${id}`} className="h-12 w-12">
               <ChevronLeft className="h-6 w-6" />
             </Link>
           </Button>
-          <Button size="lg" className="h-12 px-6" onClick={handlePrint}>
-            Print / Save as PDF
-          </Button>
+          <div className="flex flex-col gap-3">
+            <div className="flex items-center gap-4">
+              <Label className="text-sm font-medium">Group by</Label>
+              <RadioGroup
+                value={groupBy}
+                onValueChange={(v) => setGroupBy(v as "category" | "store")}
+                className="flex gap-4"
+              >
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="category" id="comb-pdf-cat" />
+                  <Label htmlFor="comb-pdf-cat" className="font-normal cursor-pointer">Category</Label>
+                </div>
+                <div className="flex items-center gap-2">
+                  <RadioGroupItem value="store" id="comb-pdf-store" />
+                  <Label htmlFor="comb-pdf-store" className="font-normal cursor-pointer">Store</Label>
+                </div>
+              </RadioGroup>
+            </div>
+            <Button size="lg" className="h-12 px-6 w-fit" onClick={handlePrint}>
+              Print / Save as PDF
+            </Button>
+          </div>
         </div>
 
         <div className="print:mb-0">
@@ -125,12 +179,14 @@ export default function CombinedPdfPage() {
               hour: "2-digit",
               minute: "2-digit",
             })}
+            {groupBy === "store" && " · By store"}
+            {groupBy === "category" && " · By category"}
           </p>
         </div>
 
         {items.length === 0 ? (
           <p className="mt-4 text-slate-600">No items in combined cart.</p>
-        ) : (
+        ) : groupBy === "category" ? (
           <div className="mt-6 space-y-6 print:mt-4 print:space-y-4">
             {categories.map((category) => (
               <Card key={category} className="print:shadow-none print:border print:border-slate-200">
@@ -147,7 +203,7 @@ export default function CombinedPdfPage() {
                         className="flex justify-between text-sm print:text-base"
                       >
                         <span className="font-medium text-slate-800">
-                          {item.nameSnapshot}
+                          {item.nameSnapshot} ({getStoreName(item.storeIdSnapshot)})
                         </span>
                         <span className="text-slate-600">
                           {item.quantityRequested} {item.unit}
@@ -158,6 +214,39 @@ export default function CombinedPdfPage() {
                 </CardContent>
               </Card>
             ))}
+          </div>
+        ) : (
+          <div className="mt-6 space-y-6 print:mt-4 print:space-y-4">
+            {storeKeys.map((key) => {
+              const storeLabel = key === "__none__" ? "No store" : getStoreName(key);
+              const storeItems = byStore.get(key)!;
+              return (
+                <Card key={key} className="print:shadow-none print:border print:border-slate-200">
+                  <CardHeader className="pb-2 print:py-2">
+                    <CardTitle className="text-base print:text-sm">
+                      {storeLabel}
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-0 print:pt-0">
+                    <ul className="space-y-2 print:space-y-1">
+                      {storeItems.map((item) => (
+                        <li
+                          key={`${item.ingredientId}-${item.unit}`}
+                          className="flex justify-between text-sm print:text-base"
+                        >
+                          <span className="font-medium text-slate-800">
+                            {item.nameSnapshot} ({item.categorySnapshot || "Other"})
+                          </span>
+                          <span className="text-slate-600">
+                            {item.quantityRequested} {item.unit}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         )}
       </div>

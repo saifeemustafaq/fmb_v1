@@ -2,7 +2,7 @@
 
 import * as React from "react"
 import { XIcon } from "lucide-react"
-import { Dialog as SheetPrimitive } from "radix-ui"
+import { Dialog as SheetPrimitive, VisuallyHidden } from "radix-ui"
 
 import { cn } from "@/lib/utils"
 
@@ -44,6 +44,17 @@ function SheetOverlay({
   )
 }
 
+// Select/dropdown content is portaled; interactions there must not close the sheet
+function isInsidePortaledContent(target: EventTarget | null): boolean {
+  const el = target as HTMLElement | null
+  if (!el?.closest) return false
+  return !!(
+    el.closest('[data-slot="select-content"]') ||
+    el.closest('[data-radix-select-content]') ||
+    el.closest('[data-radix-popper-content-wrapper]')
+  )
+}
+
 function SheetContent({
   className,
   children,
@@ -54,11 +65,23 @@ function SheetContent({
   side?: "top" | "right" | "bottom" | "left"
   showCloseButton?: boolean
 }) {
+  const handleInteractOutside = (event: { detail: { originalEvent: PointerEvent | FocusEvent }; preventDefault: () => void }) => {
+    const originalEvent = event.detail?.originalEvent
+    if (!originalEvent) return
+    const target = 'target' in originalEvent
+      ? (originalEvent as PointerEvent).target
+      : (originalEvent as FocusEvent).relatedTarget
+    if (isInsidePortaledContent(target)) {
+      event.preventDefault()
+    }
+  }
+
   return (
     <SheetPortal>
       <SheetOverlay />
       <SheetPrimitive.Content
         data-slot="sheet-content"
+        onInteractOutside={handleInteractOutside}
         className={cn(
           "bg-background data-[state=open]:animate-in data-[state=closed]:animate-out fixed z-50 flex flex-col gap-4 shadow-lg transition ease-in-out data-[state=closed]:duration-300 data-[state=open]:duration-500",
           side === "right" &&
@@ -73,6 +96,9 @@ function SheetContent({
         )}
         {...props}
       >
+        <VisuallyHidden.Root>
+          <SheetPrimitive.Title>Sheet</SheetPrimitive.Title>
+        </VisuallyHidden.Root>
         {children}
         {showCloseButton && (
           <SheetPrimitive.Close className="ring-offset-background focus:ring-ring data-[state=open]:bg-secondary absolute top-4 right-4 rounded-xs opacity-70 transition-opacity hover:opacity-100 focus:ring-2 focus:ring-offset-2 focus:outline-hidden disabled:pointer-events-none">

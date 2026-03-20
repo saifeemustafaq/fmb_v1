@@ -16,6 +16,7 @@ export type WeekPlanRecord = {
   weekStartDate: Date; // ISO date (Monday, or single-day plan date)
   createdByAdminId: ObjectId;
   assignedCookId: ObjectId; // default cook for days without per-day override
+  name?: string;
   days: WeekPlanDay[];
   notes?: string;
   createdAt: Date;
@@ -42,6 +43,8 @@ export type CartRecord = {
   weekPlanId: ObjectId;
   cookId: ObjectId;
   status: "draft" | "submitted" | "finalized";
+  /** Optional admin/cook note; shown when reviewing or printing cart */
+  notes?: string | null;
   createdAt: Date;
   updatedAt: Date;
 };

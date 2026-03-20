@@ -42,12 +42,14 @@ export async function GET(request: Request) {
                 ? plan.weekStartDate.toISOString().slice(0, 10)
                 : String(plan.weekStartDate))
             : null;
+          const weekName = plan?.name?.trim() || null;
           return {
             _id: cart._id!.toString(),
             weekPlanId: cart.weekPlanId.toString(),
             cookId: cart.cookId.toString(),
             status: cart.status,
             itemCount,
+            weekName,
             weekStartDate,
             createdAt: cart.createdAt.toISOString(),
             updatedAt: cart.updatedAt.toISOString(),

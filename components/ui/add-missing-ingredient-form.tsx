@@ -13,6 +13,7 @@ import {
 } from "./select";
 import { Textarea } from "./textarea";
 import { X } from "lucide-react";
+import { getUnitSelectOptions } from "@/lib/constants/units";
 
 // Common ingredient categories
 const CATEGORIES = [
@@ -28,9 +29,6 @@ const CATEGORIES = [
   "Oil & Ghee",
   "Other",
 ];
-
-// Common units
-const UNITS = ["kg", "g", "l", "ml", "pcs", "bunch", "pack", "can", "bottle"];
 
 interface AddMissingIngredientFormProps {
   onSubmit: (data: {
@@ -157,9 +155,9 @@ export function AddMissingIngredientForm({
               <SelectValue placeholder="Select a unit" />
             </SelectTrigger>
             <SelectContent>
-              {UNITS.map((u) => (
-                <SelectItem key={u} value={u} className="text-base">
-                  {u}
+              {getUnitSelectOptions().map((opt) => (
+                <SelectItem key={opt.value} value={opt.value} className="text-base">
+                  {opt.label}
                 </SelectItem>
               ))}
             </SelectContent>

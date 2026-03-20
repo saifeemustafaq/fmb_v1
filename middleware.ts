@@ -4,6 +4,12 @@ import { SESSION_COOKIE_NAME, type Role } from "@/lib/auth/constants";
 
 const protectedPrefixes = ["/admin", "/cook", "/volunteer"];
 
+const homeByRole: Record<Role, string> = {
+  admin: "/admin",
+  cook: "/cook",
+  volunteer: "/volunteer",
+};
+
 const jwtSecret = process.env.JWT_SECRET;
 const secretKey = jwtSecret ? new TextEncoder().encode(jwtSecret) : null;
 
@@ -20,6 +26,31 @@ function redirectToLogin(request: NextRequest) {
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  if (pathname === "/") {
+    if (!secretKey) {
+      return redirectToLogin(request);
+    }
+
+    const token = request.cookies.get(SESSION_COOKIE_NAME)?.value;
+    if (!token) {
+      return redirectToLogin(request);
+    }
+
+    try {
+      const { payload } = await jwtVerify(token, secretKey);
+      const role = payload.role as Role | undefined;
+      if (!role || !homeByRole[role]) {
+        return redirectToLogin(request);
+      }
+      return NextResponse.redirect(
+        new URL(homeByRole[role], request.url)
+      );
+    } catch {
+      return redirectToLogin(request);
+    }
+  }
+
   const prefix = protectedPrefixes.find((p) => pathname.startsWith(p));
 
   if (!prefix) {
@@ -55,5 +86,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/admin/:path*", "/cook/:path*", "/volunteer/:path*"],
+  matcher: ["/", "/admin/:path*", "/cook/:path*", "/volunteer/:path*"],
 };

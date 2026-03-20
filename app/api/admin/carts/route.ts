@@ -6,6 +6,7 @@ import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getAllCartsForAdmin, getCartItemCount } from "@/lib/carts";
 import { getWeekPlanById } from "@/lib/week-plans";
 import { getUsersCollection } from "@/lib/users";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 function weekLabelFromPlan(
   weekStartDate: Date,
@@ -45,57 +46,59 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const carts = await getAllCartsForAdmin();
-    const users = await getUsersCollection();
-    const cookIds = [...new Set(carts.map((c) => c.cookId.toString()))];
-    const weekPlanIds = [...new Set(carts.map((c) => c.weekPlanId.toString()))];
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const carts = await getAllCartsForAdmin();
+      const users = await getUsersCollection();
+      const cookIds = [...new Set(carts.map((c) => c.cookId.toString()))];
+      const weekPlanIds = [...new Set(carts.map((c) => c.weekPlanId.toString()))];
 
-    const cookMap = new Map<string, string>();
-    for (const id of cookIds) {
-      const u = await users.findOne({ _id: new ObjectId(id) });
-      if (u) cookMap.set(id, u.name);
-    }
+      const cookMap = new Map<string, string>();
+      for (const id of cookIds) {
+        const u = await users.findOne({ _id: new ObjectId(id) });
+        if (u) cookMap.set(id, u.name);
+      }
 
-    const planMap = new Map<
-      string,
-      { weekStartDate: Date; days: Array<{ date: Date }> }
-    >();
-    for (const id of weekPlanIds) {
-      const plan = await getWeekPlanById(new ObjectId(id));
-      if (plan)
-        planMap.set(id, {
-          weekStartDate: plan.weekStartDate,
-          days: plan.days ?? [],
-        });
-    }
+      const planMap = new Map<
+        string,
+        { weekStartDate: Date; days: Array<{ date: Date }> }
+      >();
+      for (const id of weekPlanIds) {
+        const plan = await getWeekPlanById(new ObjectId(id));
+        if (plan)
+          planMap.set(id, {
+            weekStartDate: plan.weekStartDate,
+            days: plan.days ?? [],
+          });
+      }
 
-    const cartsWithMeta = await Promise.all(
-      carts.map(async (cart) => {
-        const plan = planMap.get(cart.weekPlanId.toString());
-        const weekLabel = plan
-          ? weekLabelFromPlan(plan.weekStartDate, plan.days)
-          : null;
-        const itemCount = await getCartItemCount(cart._id!);
-        return {
-          _id: cart._id!.toString(),
-          weekPlanId: cart.weekPlanId.toString(),
-          cookId: cart.cookId.toString(),
-          cookName: cookMap.get(cart.cookId.toString()) ?? "Unknown",
-          status: cart.status,
-          weekStartDate: plan?.weekStartDate
-            ? (plan.weekStartDate instanceof Date
-                ? plan.weekStartDate.toISOString().slice(0, 10)
-                : String(plan.weekStartDate))
-            : null,
-          weekLabel: weekLabel ?? null,
-          itemCount,
-          createdAt: cart.createdAt.toISOString(),
-          updatedAt: cart.updatedAt.toISOString(),
-        };
-      })
-    );
+      const cartsWithMeta = await Promise.all(
+        carts.map(async (cart) => {
+          const plan = planMap.get(cart.weekPlanId.toString());
+          const weekLabel = plan
+            ? weekLabelFromPlan(plan.weekStartDate, plan.days)
+            : null;
+          const itemCount = await getCartItemCount(cart._id!);
+          return {
+            _id: cart._id!.toString(),
+            weekPlanId: cart.weekPlanId.toString(),
+            cookId: cart.cookId.toString(),
+            cookName: cookMap.get(cart.cookId.toString()) ?? "Unknown",
+            status: cart.status,
+            weekStartDate: plan?.weekStartDate
+              ? (plan.weekStartDate instanceof Date
+                  ? plan.weekStartDate.toISOString().slice(0, 10)
+                  : String(plan.weekStartDate))
+              : null,
+            weekLabel: weekLabel ?? null,
+            itemCount,
+            createdAt: cart.createdAt.toISOString(),
+            updatedAt: cart.updatedAt.toISOString(),
+          };
+        })
+      );
 
-    return NextResponse.json({ carts: cartsWithMeta });
+      return NextResponse.json({ carts: cartsWithMeta });
+    });
   } catch (error) {
     console.error("Error fetching admin carts:", error);
     return NextResponse.json(

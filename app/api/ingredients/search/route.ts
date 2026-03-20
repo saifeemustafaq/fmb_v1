@@ -4,6 +4,7 @@ import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { searchIngredients } from "@/lib/ingredients";
 import { ObjectId } from "mongodb";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function GET(request: Request) {
   try {
@@ -19,16 +20,18 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const query = searchParams.get("q") || "";
 
-    const ingredients = await searchIngredients(query, new ObjectId(user.id));
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const ingredients = await searchIngredients(query, new ObjectId(user.id));
 
-    return NextResponse.json({
-      ingredients: ingredients.map((ing) => ({
-        ...ing,
-        _id: ing._id!.toString(),
-        storeId: ing.storeId?.toString() || null,
-        ownerUserId: ing.ownerUserId?.toString() || null,
-        createdBy: ing.createdBy?.toString() || null,
-      })),
+      return NextResponse.json({
+        ingredients: ingredients.map((ing) => ({
+          ...ing,
+          _id: ing._id!.toString(),
+          storeId: ing.storeId?.toString() || null,
+          ownerUserId: ing.ownerUserId?.toString() || null,
+          createdBy: ing.createdBy?.toString() || null,
+        })),
+      });
     });
   } catch (error) {
     console.error("Error searching ingredients:", error);

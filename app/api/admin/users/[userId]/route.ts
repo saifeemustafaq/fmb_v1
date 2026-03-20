@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getUserById, updateUser, deactivateUser } from "@/lib/users";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const updateUserSchema = z.object({
   name: z.string().min(1).optional(),
@@ -36,22 +37,24 @@ export async function GET(
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
 
-    const targetUser = await getUserById(userId);
-    if (!targetUser) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const targetUser = await getUserById(userId);
+      if (!targetUser) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({
-      user: {
-        _id: targetUser._id!.toString(),
-        name: targetUser.name,
-        its: targetUser.its,
-        phoneOrEmail: targetUser.phoneOrEmail,
-        role: targetUser.role,
-        isActive: targetUser.isActive,
-        createdAt: targetUser.createdAt,
-        updatedAt: targetUser.updatedAt,
-      },
+      return NextResponse.json({
+        user: {
+          _id: targetUser._id!.toString(),
+          name: targetUser.name,
+          its: targetUser.its,
+          phoneOrEmail: targetUser.phoneOrEmail,
+          role: targetUser.role,
+          isActive: targetUser.isActive,
+          createdAt: targetUser.createdAt,
+          updatedAt: targetUser.updatedAt,
+        },
+      });
     });
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -107,12 +110,14 @@ export async function PATCH(
       );
     }
 
-    const success = await updateUser(userId, parsed.data);
-    if (!success) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(currentUser), async () => {
+      const success = await updateUser(userId, parsed.data);
+      if (!success) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({ message: "User updated successfully" });
+      return NextResponse.json({ message: "User updated successfully" });
+    });
   } catch (error) {
     console.error("Error updating user:", error);
     return NextResponse.json(
@@ -153,12 +158,14 @@ export async function DELETE(
       );
     }
 
-    const success = await deactivateUser(userId);
-    if (!success) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(currentUser), async () => {
+      const success = await deactivateUser(userId);
+      if (!success) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({ message: "User deactivated successfully" });
+      return NextResponse.json({ message: "User deactivated successfully" });
+    });
   } catch (error) {
     console.error("Error deleting user:", error);
     return NextResponse.json(

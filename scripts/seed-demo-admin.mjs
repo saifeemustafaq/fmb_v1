@@ -5,10 +5,12 @@ import { loadProjectEnv } from "./load-project-env.mjs";
 loadProjectEnv();
 
 const uri = process.env.MONGODB_URI;
-const itsRaw = process.env.ADMIN_ITS;
-const password = process.env.ADMIN_PASSWORD;
-const name = process.env.ADMIN_NAME || "Admin";
-const phoneOrEmail = process.env.ADMIN_CONTACT || "";
+const dbName =
+  process.env.MONGODB_DB || process.env.MONGODB_DEMO_DB || "fmb_demo";
+const itsRaw = process.env.DEMO_ITS;
+const password = process.env.DEMO_PASSWORD;
+const name = process.env.DEMO_ADMIN_NAME || "Demo Admin";
+const phoneOrEmail = process.env.DEMO_CONTACT || "";
 
 if (!uri) {
   console.error("Missing MONGODB_URI in environment.");
@@ -16,13 +18,13 @@ if (!uri) {
 }
 
 if (!itsRaw || !password) {
-  console.error("Missing ADMIN_ITS or ADMIN_PASSWORD in environment.");
+  console.error("Missing DEMO_ITS or DEMO_PASSWORD in environment.");
   process.exit(1);
 }
 
 const its = Number.parseInt(itsRaw, 10);
 if (!Number.isFinite(its)) {
-  console.error("ADMIN_ITS must be a valid number.");
+  console.error("DEMO_ITS must be a valid number.");
   process.exit(1);
 }
 
@@ -30,7 +32,6 @@ const client = new MongoClient(uri);
 
 try {
   await client.connect();
-  const dbName = process.env.MONGODB_DB || "fmb";
   const db = client.db(dbName);
   const users = db.collection("users");
 
@@ -53,16 +54,16 @@ try {
         createdAt: now,
       },
     },
-    { upsert: true },
+    { upsert: true }
   );
 
   if (result.upsertedId) {
-    console.log("Admin user created.");
+    console.log("Demo admin user created.");
   } else {
-    console.log("Admin user updated.");
+    console.log("Demo admin user updated.");
   }
 } catch (error) {
-  console.error("Failed to seed admin:", error);
+  console.error("Failed to seed demo admin:", error);
   process.exit(1);
 } finally {
   await client.close();

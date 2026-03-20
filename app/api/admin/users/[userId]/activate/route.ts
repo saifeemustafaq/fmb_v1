@@ -4,6 +4,7 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { reactivateUser } from "@/lib/users";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function PATCH(
   request: Request,
@@ -28,12 +29,14 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid user ID" }, { status: 400 });
     }
 
-    const success = await reactivateUser(userId);
-    if (!success) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const success = await reactivateUser(userId);
+      if (!success) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({ message: "User reactivated successfully" });
+      return NextResponse.json({ message: "User reactivated successfully" });
+    });
   } catch (error) {
     console.error("Error reactivating user:", error);
     return NextResponse.json(

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import {
   SESSION_COOKIE_NAME,
   SESSION_MAX_AGE_SECONDS,
+  DEMO_SESSION_MAX_AGE_SECONDS,
   type Role,
 } from "@/lib/auth/constants";
 
@@ -18,6 +19,8 @@ export type SessionUser = {
   its: number;
   role: Role;
   name?: string | null;
+  /** JWT + DB sandbox; all API data uses demo MongoDB when true */
+  demo?: boolean;
 };
 
 export async function hashPassword(password: string) {
@@ -29,15 +32,19 @@ export async function verifyPassword(password: string, passwordHash: string) {
 }
 
 export async function createSessionToken(user: SessionUser) {
+  const maxAge = user.demo
+    ? DEMO_SESSION_MAX_AGE_SECONDS
+    : SESSION_MAX_AGE_SECONDS;
   return new SignJWT({
     its: user.its,
     role: user.role,
     name: user.name ?? null,
+    ...(user.demo ? { demo: true } : {}),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(user.id)
     .setIssuedAt()
-    .setExpirationTime(`${SESSION_MAX_AGE_SECONDS}s`)
+    .setExpirationTime(`${maxAge}s`)
     .sign(secretKey);
 }
 
@@ -64,16 +71,17 @@ export async function verifySessionToken(token: string): Promise<SessionUser> {
     its: itsValue,
     role: payload.role as Role,
     name: typeof payload.name === "string" ? payload.name : null,
+    demo: payload.demo === true,
   };
 }
 
-export function getSessionCookieOptions() {
+export function getSessionCookieOptions(maxAgeSeconds?: number) {
   return {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax" as const,
     path: "/",
-    maxAge: SESSION_MAX_AGE_SECONDS,
+    maxAge: maxAgeSeconds ?? SESSION_MAX_AGE_SECONDS,
   };
 }
 

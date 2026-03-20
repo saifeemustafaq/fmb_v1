@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { z } from "zod";
 import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
-import { checkITSExists, getUsersCollection } from "@/lib/users";
+import { getUsersCollection } from "@/lib/users";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function GET(request: Request) {
   try {
@@ -41,17 +41,18 @@ export async function GET(request: Request) {
       );
     }
 
-    const users = await getUsersCollection();
-    const query: any = { its: itsNumber };
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const users = await getUsersCollection();
+      const query: Record<string, unknown> = { its: itsNumber };
 
-    // If excludeUserId is provided (editing existing user), exclude it from check
-    if (excludeUserId && ObjectId.isValid(excludeUserId)) {
-      query._id = { $ne: new ObjectId(excludeUserId) };
-    }
+      if (excludeUserId && ObjectId.isValid(excludeUserId)) {
+        query._id = { $ne: new ObjectId(excludeUserId) };
+      }
 
-    const exists = await users.countDocuments(query);
+      const exists = await users.countDocuments(query);
 
-    return NextResponse.json({ available: exists === 0 });
+      return NextResponse.json({ available: exists === 0 });
+    });
   } catch (error) {
     console.error("Error checking ITS:", error);
     return NextResponse.json(

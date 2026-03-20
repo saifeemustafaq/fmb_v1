@@ -7,6 +7,7 @@ import { getCartById } from "@/lib/carts";
 import { getWeekPlanById } from "@/lib/week-plans";
 import { getUsersCollection } from "@/lib/users";
 import type { CartItemRecord } from "@/lib/interfaces/cart";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 function weekLabelFromPlan(
   weekStartDate: Date,
@@ -53,49 +54,51 @@ export async function GET(
     }
 
     const cartObjectId = new ObjectId(cartId);
-    const result = await getCartById(cartObjectId);
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const result = await getCartById(cartObjectId);
 
-    if (!result) {
-      return NextResponse.json({ error: "Cart not found" }, { status: 404 });
-    }
+      if (!result) {
+        return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+      }
 
-    const { cart, items } = result;
+      const { cart, items } = result;
 
-    if (
-      user.role !== "admin" &&
-      cart.cookId.toString() !== user.id
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+      if (
+        user.role !== "admin" &&
+        cart.cookId.toString() !== user.id
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
 
-    const cartPayload = {
-      ...cart,
-      _id: cart._id!.toString(),
-      weekPlanId: cart.weekPlanId.toString(),
-      cookId: cart.cookId.toString(),
-    };
+      const cartPayload = {
+        ...cart,
+        _id: cart._id!.toString(),
+        weekPlanId: cart.weekPlanId.toString(),
+        cookId: cart.cookId.toString(),
+      };
 
-    if (user.role === "admin") {
-      const [cookUser, plan] = await Promise.all([
-        getUsersCollection().then((u) => u.findOne({ _id: cart.cookId })),
-        getWeekPlanById(cart.weekPlanId),
-      ]);
-      (cartPayload as Record<string, unknown>).cookName = cookUser?.name ?? "Unknown";
-      (cartPayload as Record<string, unknown>).weekLabel = plan
-        ? weekLabelFromPlan(plan.weekStartDate, plan.days ?? [])
-        : null;
-    }
+      if (user.role === "admin") {
+        const [cookUser, plan] = await Promise.all([
+          getUsersCollection().then((u) => u.findOne({ _id: cart.cookId })),
+          getWeekPlanById(cart.weekPlanId),
+        ]);
+        (cartPayload as Record<string, unknown>).cookName = cookUser?.name ?? "Unknown";
+        (cartPayload as Record<string, unknown>).weekLabel = plan
+          ? weekLabelFromPlan(plan.weekStartDate, plan.days ?? [])
+          : null;
+      }
 
-    return NextResponse.json({
-      cart: cartPayload,
-      items: items.map((item: CartItemRecord) => ({
-        ...item,
-        _id: item._id!.toString(),
-        cartId: item.cartId.toString(),
-        ingredientId: item.ingredientId.toString(),
-        storeIdSnapshot: item.storeIdSnapshot?.toString() || null,
-        addedByUserId: item.addedByUserId.toString(),
-      })),
+      return NextResponse.json({
+        cart: cartPayload,
+        items: items.map((item: CartItemRecord) => ({
+          ...item,
+          _id: item._id!.toString(),
+          cartId: item.cartId.toString(),
+          ingredientId: item.ingredientId.toString(),
+          storeIdSnapshot: item.storeIdSnapshot?.toString() || null,
+          addedByUserId: item.addedByUserId.toString(),
+        })),
+      });
     });
   } catch (error) {
     console.error("Error fetching cart:", error);

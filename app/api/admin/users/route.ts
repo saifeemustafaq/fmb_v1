@@ -5,6 +5,7 @@ import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { getAllUsers, createUser, checkITSExists } from "@/lib/users";
 import type { UserListFilters } from "@/lib/interfaces/user";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const createUserSchema = z.object({
   name: z.string().min(1, "Name is required"),
@@ -58,21 +59,22 @@ export async function GET(request: Request) {
       filters.sortOrder = sortOrder as any;
     }
 
-    const users = await getAllUsers(filters);
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const users = await getAllUsers(filters);
 
-    // Remove password hashes from response
-    const sanitizedUsers = users.map((u) => ({
-      _id: u._id!.toString(),
-      name: u.name,
-      its: u.its,
-      phoneOrEmail: u.phoneOrEmail,
-      role: u.role,
-      isActive: u.isActive,
-      createdAt: u.createdAt,
-      updatedAt: u.updatedAt,
-    }));
+      const sanitizedUsers = users.map((u) => ({
+        _id: u._id!.toString(),
+        name: u.name,
+        its: u.its,
+        phoneOrEmail: u.phoneOrEmail,
+        role: u.role,
+        isActive: u.isActive,
+        createdAt: u.createdAt,
+        updatedAt: u.updatedAt,
+      }));
 
-    return NextResponse.json({ users: sanitizedUsers });
+      return NextResponse.json({ users: sanitizedUsers });
+    });
   } catch (error) {
     console.error("Error fetching users:", error);
     return NextResponse.json(
@@ -108,33 +110,33 @@ export async function POST(request: Request) {
       );
     }
 
-    // Check if ITS already exists
-    const itsExists = await checkITSExists(parsed.data.its);
-    if (itsExists) {
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const itsExists = await checkITSExists(parsed.data.its);
+      if (itsExists) {
+        return NextResponse.json(
+          { error: "ITS number already exists" },
+          { status: 409 }
+        );
+      }
+
+      const newUser = await createUser(parsed.data);
+
       return NextResponse.json(
-        { error: "ITS number already exists" },
-        { status: 409 }
-      );
-    }
-
-    // Create user
-    const newUser = await createUser(parsed.data);
-
-    return NextResponse.json(
-      {
-        user: {
-          _id: newUser._id!.toString(),
-          name: newUser.name,
-          its: newUser.its,
-          phoneOrEmail: newUser.phoneOrEmail,
-          role: newUser.role,
-          isActive: newUser.isActive,
-          createdAt: newUser.createdAt,
+        {
+          user: {
+            _id: newUser._id!.toString(),
+            name: newUser.name,
+            its: newUser.its,
+            phoneOrEmail: newUser.phoneOrEmail,
+            role: newUser.role,
+            isActive: newUser.isActive,
+            createdAt: newUser.createdAt,
+          },
+          message: "User created successfully",
         },
-        message: "User created successfully",
-      },
-      { status: 201 }
-    );
+        { status: 201 }
+      );
+    });
   } catch (error) {
     console.error("Error creating user:", error);
     return NextResponse.json(

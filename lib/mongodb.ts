@@ -1,7 +1,8 @@
 import { MongoClient, ServerApiVersion, Db } from "mongodb";
+import { getAppDbName } from "@/lib/app-db-context";
 
 if (!process.env.MONGODB_URI) {
-  throw new Error("Please add your MongoDB URI to .env.local");
+  throw new Error("Please add MONGODB_URI to .env or .env.local");
 }
 
 const uri = process.env.MONGODB_URI;
@@ -43,17 +44,17 @@ if (process.env.NODE_ENV === "development") {
 export default clientPromise;
 
 // Helper function to get database
-export async function getDatabase(dbName: string = "fmb"): Promise<Db> {
+export async function getDatabase(dbName?: string): Promise<Db> {
   const client = await clientPromise;
-  return client.db(dbName);
+  return client.db(dbName ?? getAppDbName());
 }
 
 // Synchronous helper to get database (assumes connection is ready)
-export function getDb(dbName: string = "fmb"): Db {
+export function getDb(dbName?: string): Db {
   if (!client) {
     throw new Error("MongoDB client not initialized. Call initMongoDB() first.");
   }
-  return client.db(dbName);
+  return client.db(dbName ?? getAppDbName());
 }
 
 // Initialize connection and verify it works

@@ -12,6 +12,7 @@ import {
   serializeWeekPlanForResponse,
 } from "@/lib/week-plans";
 import type { DayType } from "@/lib/interfaces/cart";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const dayTypeEnum = z.enum([
   "no_thali",
@@ -59,9 +60,11 @@ export async function GET() {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const plans = await listAllWeekPlans();
-    return NextResponse.json({
-      weekPlans: plans.map(serializeWeekPlanForResponse),
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const plans = await listAllWeekPlans();
+      return NextResponse.json({
+        weekPlans: plans.map(serializeWeekPlanForResponse),
+      });
     });
   } catch (error) {
     console.error("Error listing week plans:", error);
@@ -95,46 +98,48 @@ export async function POST(request: Request) {
     }
 
     const { weekStartDate, assignedCookId, days, notes, name } = parsed.data;
-    const isSingleDay = days.length === 1;
-    const anchorDate = isSingleDay ? new Date(days[0].date) : new Date(weekStartDate);
-    const normalizedMonday = normalizeToMonday(anchorDate);
-    const { fullWeekCount, singleDayCount } = await countPlansForWeek(normalizedMonday);
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const isSingleDay = days.length === 1;
+      const anchorDate = isSingleDay ? new Date(days[0].date) : new Date(weekStartDate);
+      const normalizedMonday = normalizeToMonday(anchorDate);
+      const { fullWeekCount, singleDayCount } = await countPlansForWeek(normalizedMonday);
 
-    if (!isSingleDay && fullWeekCount >= 1) {
+      if (!isSingleDay && fullWeekCount >= 1) {
+        return NextResponse.json(
+          { error: "A full-week plan already exists for this week." },
+          { status: 409 }
+        );
+      }
+      if (isSingleDay && singleDayCount >= 6) {
+        return NextResponse.json(
+          { error: "Only 6 single-day plans are allowed per week." },
+          { status: 409 }
+        );
+      }
+
+      const weekPlanData = {
+        weekStartDate: normalizedMonday,
+        createdByAdminId: new ObjectId(user.id),
+        assignedCookId: new ObjectId(assignedCookId),
+        name: name?.trim() ? name.trim() : undefined,
+        days: days.map((d) => ({
+          date: new Date(d.date),
+          dayType: d.dayType as DayType,
+          headcount: d.headcount,
+          menuItems: d.menuItems,
+          assignedCookId: d.assignedCookId
+            ? new ObjectId(d.assignedCookId)
+            : undefined,
+        })),
+        notes,
+      };
+
+      const id = await createWeekPlan(weekPlanData);
       return NextResponse.json(
-        { error: "A full-week plan already exists for this week." },
-        { status: 409 }
+        { weekPlanId: id.toString(), message: "Week plan created" },
+        { status: 201 }
       );
-    }
-    if (isSingleDay && singleDayCount >= 6) {
-      return NextResponse.json(
-        { error: "Only 6 single-day plans are allowed per week." },
-        { status: 409 }
-      );
-    }
-
-    const weekPlanData = {
-      weekStartDate: normalizedMonday,
-      createdByAdminId: new ObjectId(user.id),
-      assignedCookId: new ObjectId(assignedCookId),
-      name: name?.trim() ? name.trim() : undefined,
-      days: days.map((d) => ({
-        date: new Date(d.date),
-        dayType: d.dayType as DayType,
-        headcount: d.headcount,
-        menuItems: d.menuItems,
-        assignedCookId: d.assignedCookId
-          ? new ObjectId(d.assignedCookId)
-          : undefined,
-      })),
-      notes,
-    };
-
-    const id = await createWeekPlan(weekPlanData);
-    return NextResponse.json(
-      { weekPlanId: id.toString(), message: "Week plan created" },
-      { status: 201 }
-    );
+    });
   } catch (error) {
     console.error("Error creating week plan:", error);
     return NextResponse.json(

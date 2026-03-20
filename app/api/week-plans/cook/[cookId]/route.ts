@@ -7,6 +7,7 @@ import {
   getCookAssignedWeekPlan,
   serializeWeekPlanForResponse,
 } from "@/lib/week-plans";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 export async function GET(
   request: Request,
@@ -34,17 +35,19 @@ export async function GET(
     }
 
     const cookObjectId = new ObjectId(cookId);
-    const weekPlan = await getCookAssignedWeekPlan(cookObjectId);
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const weekPlan = await getCookAssignedWeekPlan(cookObjectId);
 
-    if (!weekPlan) {
-      return NextResponse.json(
-        { weekPlan: null, message: "No assigned week plan" },
-        { status: 200 }
-      );
-    }
+      if (!weekPlan) {
+        return NextResponse.json(
+          { weekPlan: null, message: "No assigned week plan" },
+          { status: 200 }
+        );
+      }
 
-    return NextResponse.json({
-      weekPlan: serializeWeekPlanForResponse(weekPlan),
+      return NextResponse.json({
+        weekPlan: serializeWeekPlanForResponse(weekPlan),
+      });
     });
   } catch (error) {
     console.error("Error fetching week plan:", error);

@@ -6,6 +6,7 @@ import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { addItemToCart, getCartById } from "@/lib/carts";
 import { getIngredientById } from "@/lib/ingredients";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const addItemSchema = z.object({
   ingredientId: z.string().refine((id) => ObjectId.isValid(id), {
@@ -49,54 +50,52 @@ export async function POST(
     const cartObjectId = new ObjectId(cartId);
     const ingredientId = new ObjectId(parsed.data.ingredientId);
 
-    // Verify cart exists and user has access
-    const cartResult = await getCartById(cartObjectId);
-    if (!cartResult) {
-      return NextResponse.json({ error: "Cart not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const cartResult = await getCartById(cartObjectId);
+      if (!cartResult) {
+        return NextResponse.json({ error: "Cart not found" }, { status: 404 });
+      }
 
-    const { cart } = cartResult;
+      const { cart } = cartResult;
 
-    if (
-      user.role !== "admin" &&
-      cart.cookId.toString() !== user.id
-    ) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-    }
+      if (
+        user.role !== "admin" &&
+        cart.cookId.toString() !== user.id
+      ) {
+        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      }
 
-    // Finalized carts are locked for edits
-    if (cart.status === "finalized") {
-      return NextResponse.json(
-        { error: "Cannot modify finalized cart" },
-        { status: 400 }
+      if (cart.status === "finalized") {
+        return NextResponse.json(
+          { error: "Cannot modify finalized cart" },
+          { status: 400 }
+        );
+      }
+
+      const ingredient = await getIngredientById(ingredientId);
+      if (!ingredient) {
+        return NextResponse.json(
+          { error: "Ingredient not found" },
+          { status: 404 }
+        );
+      }
+
+      const itemId = await addItemToCart(
+        cartObjectId,
+        ingredient,
+        parsed.data.quantity,
+        parsed.data.unit,
+        new ObjectId(user.id)
       );
-    }
 
-    // Get ingredient details for snapshot
-    const ingredient = await getIngredientById(ingredientId);
-    if (!ingredient) {
       return NextResponse.json(
-        { error: "Ingredient not found" },
-        { status: 404 }
+        {
+          itemId: itemId.toString(),
+          message: "Item added to cart",
+        },
+        { status: 201 }
       );
-    }
-
-    // Add item to cart
-    const itemId = await addItemToCart(
-      cartObjectId,
-      ingredient,
-      parsed.data.quantity,
-      parsed.data.unit,
-      new ObjectId(user.id)
-    );
-
-    return NextResponse.json(
-      {
-        itemId: itemId.toString(),
-        message: "Item added to cart",
-      },
-      { status: 201 }
-    );
+    });
   } catch (error) {
     console.error("Error adding item to cart:", error);
     return NextResponse.json(

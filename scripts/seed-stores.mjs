@@ -9,15 +9,15 @@
  */
 
 import { MongoClient } from "mongodb";
-import dotenv from "dotenv";
+import { loadProjectEnv } from "./load-project-env.mjs";
 
-dotenv.config({ path: ".env.local" });
+loadProjectEnv();
 
 const MONGODB_URI = process.env.MONGODB_URI;
 const MONGODB_DB = process.env.MONGODB_DB || "fmb";
 
 if (!MONGODB_URI) {
-  console.error("❌ MONGODB_URI not defined in .env.local");
+  console.error("❌ MONGODB_URI not defined in .env or .env.local");
   process.exit(1);
 }
 

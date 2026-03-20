@@ -1,7 +1,7 @@
 import { MongoClient } from "mongodb";
-import { config } from "dotenv";
+import { loadProjectEnv } from "./load-project-env.mjs";
 
-config({ path: ".env.local" });
+loadProjectEnv();
 
 const uri = process.env.MONGODB_URI;
 if (!uri) {

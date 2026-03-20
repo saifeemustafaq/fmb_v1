@@ -5,6 +5,7 @@ import { ObjectId } from "mongodb";
 import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { updateUserPassword } from "@/lib/users";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const passwordSchema = z.object({
   newPassword: z
@@ -49,12 +50,14 @@ export async function PATCH(
       );
     }
 
-    const success = await updateUserPassword(userId, parsed.data.newPassword);
-    if (!success) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
-    }
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const success = await updateUserPassword(userId, parsed.data.newPassword);
+      if (!success) {
+        return NextResponse.json({ error: "User not found" }, { status: 404 });
+      }
 
-    return NextResponse.json({ message: "Password updated successfully" });
+      return NextResponse.json({ message: "Password updated successfully" });
+    });
   } catch (error) {
     console.error("Error updating password:", error);
     return NextResponse.json(

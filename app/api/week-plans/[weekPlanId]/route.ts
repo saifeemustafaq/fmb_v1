@@ -13,6 +13,7 @@ import {
   getDaysForCook,
 } from "@/lib/week-plans";
 import type { DayType } from "@/lib/interfaces/cart";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const dayTypeEnum = z.enum([
   "no_thali",
@@ -69,22 +70,23 @@ export async function GET(
     }
 
     const weekPlanObjectId = new ObjectId(weekPlanId);
-    const plan = await getWeekPlanById(weekPlanObjectId);
+    return runWithAppDb(dbNameForSession(user), async () => {
+      const plan = await getWeekPlanById(weekPlanObjectId);
 
-    if (!plan) {
-      return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
-    }
-
-    // Admin can see any plan; cook can only see if assigned (week or any day)
-    if (user.role !== "admin") {
-      const cookDays = getDaysForCook(plan, new ObjectId(user.id));
-      if (cookDays.length === 0) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      if (!plan) {
+        return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
       }
-    }
 
-    return NextResponse.json({
-      weekPlan: serializeWeekPlanForResponse(plan),
+      if (user.role !== "admin") {
+        const cookDays = getDaysForCook(plan, new ObjectId(user.id));
+        if (cookDays.length === 0) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+      }
+
+      return NextResponse.json({
+        weekPlan: serializeWeekPlanForResponse(plan),
+      });
     });
   } catch (error) {
     console.error("Error fetching week plan:", error);
@@ -116,11 +118,6 @@ export async function PATCH(
       return NextResponse.json({ error: "Invalid week plan ID" }, { status: 400 });
     }
 
-    const plan = await getWeekPlanById(new ObjectId(weekPlanId));
-    if (!plan) {
-      return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
-    }
-
     const body = await request.json();
     const parsed = updateWeekPlanSchema.safeParse(body);
     if (!parsed.success) {
@@ -128,6 +125,12 @@ export async function PATCH(
         { error: "Validation failed", details: parsed.error.flatten() },
         { status: 400 }
       );
+    }
+
+    return runWithAppDb(dbNameForSession(user), async () => {
+    const plan = await getWeekPlanById(new ObjectId(weekPlanId));
+    if (!plan) {
+      return NextResponse.json({ error: "Week plan not found" }, { status: 404 });
     }
 
     const updates: Record<string, unknown> = {};
@@ -212,6 +215,7 @@ export async function PATCH(
         ? serializeWeekPlanForResponse(updatedPlan)
         : null,
       message: "Week plan updated",
+    });
     });
   } catch (error) {
     console.error("Error updating week plan:", error);

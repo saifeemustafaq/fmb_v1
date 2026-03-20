@@ -11,7 +11,9 @@
     "seed:admin": "npx tsx scripts/seed-admin.mjs",
     "seed:stores": "npx tsx scripts/seed-stores.mjs",
     "seed:ingredients": "npx tsx scripts/seed-ingredients.mjs",
-    "create:indexes": "npx tsx scripts/create-indexes.mjs"
+    "create:indexes": "npx tsx scripts/create-indexes.mjs",
+    "seed:demo": "node scripts/seed-demo-admin.mjs",
+    "reset:demo": "npx tsx scripts/reset-demo-sandbox.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.1.0",

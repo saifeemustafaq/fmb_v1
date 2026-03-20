@@ -6,6 +6,7 @@ import { verifySessionToken } from "@/lib/auth";
 import { SESSION_COOKIE_NAME } from "@/lib/auth/constants";
 import { createCart, getCartByWeekAndCook, getCookCarts, getCartItemCount } from "@/lib/carts";
 import { getWeekPlanById } from "@/lib/week-plans";
+import { dbNameForSession, runWithAppDb } from "@/lib/session-db";
 
 const createCartSchema = z.object({
   weekPlanId: z.string().refine((id) => ObjectId.isValid(id), {
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
     const weekPlanIdParam = searchParams.get("weekPlanId");
     const cookId = new ObjectId(user.id);
 
+    return runWithAppDb(dbNameForSession(user), async () => {
     // List all carts for the cook (history) when weekPlanId is omitted
     if (!weekPlanIdParam || weekPlanIdParam.trim() === "") {
       const carts = await getCookCarts(cookId);
@@ -83,6 +85,7 @@ export async function GET(request: Request) {
         updatedAt: cart.updatedAt.toISOString(),
       },
     });
+    });
   } catch (error) {
     console.error("Error fetching cart:", error);
     return NextResponse.json(
@@ -107,7 +110,6 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    // Parse request body
     const body = await request.json().catch(() => null);
     const parsed = createCartSchema.safeParse(body);
 
@@ -121,7 +123,7 @@ export async function POST(request: Request) {
     const weekPlanId = new ObjectId(parsed.data.weekPlanId);
     const cookId = new ObjectId(user.id);
 
-    // Check if cart already exists for this week and cook
+    return runWithAppDb(dbNameForSession(user), async () => {
     const existing = await getCartByWeekAndCook(weekPlanId, cookId);
     if (existing) {
       return NextResponse.json({
@@ -131,7 +133,6 @@ export async function POST(request: Request) {
       });
     }
 
-    // Create new cart
     const cartId = await createCart(weekPlanId, cookId);
 
     return NextResponse.json(
@@ -141,6 +142,7 @@ export async function POST(request: Request) {
       },
       { status: 201 }
     );
+    });
   } catch (error) {
     console.error("Error creating cart:", error);
     return NextResponse.json(
